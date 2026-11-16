@@ -144,3 +144,12 @@ Windows 11 Pro (26200), Radeon RX 9070 XT, two Sceptre M24 monitors at 1920x1080
 - **Nothing was sent to the glasses.**
 - **Still not proven:** whether a window looks still to someone wearing the glasses (needs the picture in the
   glasses, so USB-C video), the "XREAL 1 Ultra" display on Windows, the pointer push-back, 3D, `--settings`.
+
+**Second test the same evening, the second monitor standing in for the glasses (`--display 1`):**
+
+- Full screen on the 180 Hz monitor with the Aura's real tracking: 180 frames a second (167 in the first 5 s),
+  1000 reports a second throughout, the main screen captured at 54 to 59 pictures a second.
+- The gyro zero was learnt within the first 10 s.
+- Recentre (Ctrl+Alt+R) and bigger / smaller (Ctrl+Alt+Up / Down) were used and logged.
+- Mike, watching the monitor while moving the glasses: "Yes, tracks right."
+- This shows the tracking follows the head the right way. It does not show a window held still in the glasses.
