@@ -65,8 +65,14 @@ If Windows does not pick the driver, the fix to try is choosing "UsbNcm Host Dev
 This PC has several adapters with 169.254 addresses, so Pocket XR does not trust the routing table: it binds its
 sockets to the local address on the glasses' link.
 
-**The picture:** the glasses need DisplayPort over USB-C. This PC's graphics card may have no USB-C port, so the
-picture may need an adapter that carries both DisplayPort and USB data. **To check with Mike.**
+**The picture:** the glasses need DisplayPort over USB-C. Mike, 15 November 2026: this PC has no USB-C port with
+video. So on this PC:
+
+| Way | What it proves | Cost |
+| --- | --- | --- |
+| The Aura on any USB data port | The network link and head tracking (steps 1 and 2). The picture is checked on a monitor standing in for the glasses (`--display 1`). | Nothing. Whether the Aura starts its USB network with no video is itself **to prove**. |
+| A DisplayPort to USB-C adapter that also carries USB data (the kind sold for USB-C monitors and pen displays, with a DisplayPort plug and a USB plug on the PC side) | Everything, on this PC. | An adapter to buy; which ones work with XREAL glasses is **to check** before buying. |
+| A laptop or handheld with USB-C video | Everything, on another Windows machine. | Needs Python 3.10 or newer there. |
 
 ## Head tracking
 
