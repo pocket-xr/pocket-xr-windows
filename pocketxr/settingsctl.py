@@ -1,0 +1,306 @@
+"""The glasses' own settings, kept right for the view the user picked, as Pocket XR does on the phone.
+
+Runs in its own thread. Only commands Pocket XR has proven are sent (see control.py), one at a time,
+at least 3 s apart, each read back (on the Deck, 11 Nov 2026, a Spatial Anchor set sent within a
+second of Ultrawide was refused with 5001).
+
+  3DoF on the Aura:  Spatial Anchor off, Ultrawide off (the app does the head tracking).
+  Steady in 6DoF:    2D, Ultrawide on, largest size, then Spatial Anchor on, last.
+                     On the One series with the XREAL Eye, the user turns 6DoF on in the glasses' menu.
+  Quit:              Steady's Spatial Anchor off first, then Ultrawide off.
+"""
+import queue
+import threading
+import time
+
+from . import control as c
+from .i18n import N_, tr
+
+SET_GAP_S = 3.0
+# Pocket XR GlassesDisplayCommands.keepFollow: Ultrawide or Spatial Anchor leaves the Aura in hover ("anchor") and it
+# stays there, through a replug too; follow is sent, read back after 1.5 s, tried every 3 s, 3 times a plug-in.
+FOLLOW_READ_S = 1.5
+FOLLOW_RETRY_S = 3.0
+FOLLOW_TRIES = 3
+FOLLOW_CHECK_S = 5.0
+# Pocket XR (GlassesDisplayCommands, GLASSES.md "3D mode"): the Space wants 3D side by side, so the app asks for it once
+# a plug-in, again if the glasses drop it straight away, and after that the mode is the user's. 3D waits FOLLOW_SETTLE_S
+# after a follow: Ultrawide off, follow and 3D 3 s apart once left the Aura's picture blank.
+FOLLOW_SETTLE_S = 3.0
+SBS_TRIES = 2
+SBS_DROP_WINDOW_S = 20.0
+TRIES = 2
+SIZE_SAME = 0.005
+
+TURN_ON_6DOF = N_("Turn on 6DoF in your glasses' menu (Spatial Display) so the screen stays put as you move.")
+TURN_OFF_6DOF = N_("Turn 6DoF off again in your glasses' menu.")
+SPATIAL_ANCHOR_FAILED = N_("Spatial Anchor did not come on. Try again, or turn it on in the glasses' menu.")
+# Messages that ask for something in the glasses' own menu: the app also shows these as a desktop notification.
+NOTIFY = (TURN_ON_6DOF, TURN_OFF_6DOF, SPATIAL_ANCHOR_FAILED)
+
+
+def flag(a):
+    return 0 if a is None or a.value is None else int(a.value)
+
+
+class SettingsControl(threading.Thread):
+    """Holds the control link and works toward the wanted view. Calls on_state(dict) and on_message(text)."""
+
+    def __init__(self, glasses, log, on_state, on_message):
+        super().__init__(daemon=True)
+        self.glasses = glasses
+        self.log = log
+        self.on_state = on_state
+        self.on_message = on_message
+        self.jobs = queue.Queue()
+        self.link = None
+        self.stop = False
+        self.state = {}
+        self.wanted = None
+        self.busy = False
+        # What this app turned on, so quitting puts back only that.
+        self.we_set_ultrawide = False
+        self.we_set_anchor = False
+        self.follow_tries = 0
+        self.last_follow_check = 0.0
+        self.follow_sent_at = 0.0
+        self.want_3d = lambda: True  # the app's "3D side by side" setting
+        # Steady mode on a wide canvas (Ultrawide, largest size), as on the desktop; Gaming Mode keeps the game 16:9
+        # and only asks for Spatial Anchor.
+        self.steady_wide = True
+        self.sbs_tries = 0
+        self.sbs_first_at = None
+        self.we_set_3d = False
+
+    # ---- requests from the app ----
+    def want(self, view):
+        self.jobs.put(("view", view))
+
+    def recentre(self):
+        self.jobs.put(("recentre", None))
+
+    def restore(self, done):
+        """Put the glasses back for normal use, then call done()."""
+        self.jobs.put(("restore", done))
+
+    # ---- the thread ----
+    def run(self):
+        while not self.stop:
+            if self.link is None or self.link.closed:
+                if not self._open():
+                    time.sleep(2.0)
+                    continue
+            try:
+                job, arg = self.jobs.get(timeout=1.0)
+            except queue.Empty:
+                if time.monotonic() - self.last_follow_check >= FOLLOW_CHECK_S:
+                    try:
+                        self._keep_follow()
+                        self._keep_3d()
+                    except OSError as e:
+                        self.log(f"settings: link lost ({e})")
+                        self.link = None
+                continue
+            try:
+                self.busy = True
+                if job == "view":
+                    if arg != self.wanted:
+                        self.follow_tries = 0
+                    self.wanted = arg
+                    self._apply(arg)
+                elif job == "recentre":
+                    if self.state.get("ultrawide") == 1:
+                        self.link.request(c.recenter)
+                elif job == "restore":
+                    self._restore()
+                    arg()
+            except OSError as e:
+                self.log(f"settings: link lost ({e})")
+                self.link = None
+            finally:
+                self.busy = False
+                self._publish()
+
+    def _open(self):
+        try:
+            self.link = c.Link(log=self.log)
+        except OSError as e:
+            self.log(f"settings: control link not open yet ({e})")
+            return False
+        self.log("settings: control link open")
+        self.follow_tries = 0
+        self.sbs_tries = 0
+        self.sbs_first_at = None
+        self._read()
+        if self.wanted:
+            self.jobs.put(("view", self.wanted))
+        return True
+
+    def _read(self):
+        g = self.link
+        st = {
+            "stereo": flag(g.get(c.STEREO_GET)),
+            "anchor": flag(g.get(c.ANCHOR_GET)),
+        }
+        rng = g.get(c.SIZE_RANGE)
+        size = g.get(c.SIZE_GET)
+        st["size"] = size.value if size else None
+        st["size_max"] = rng.value3 if rng else None
+        # Ultrawide last: when it says on, the range read beside it is already Ultrawide's own (Pocket XR).
+        st["ultrawide"] = flag(g.get(c.ULTRAWIDE_GET))
+        self.state = st
+        self._publish()
+        return st
+
+    def _publish(self):
+        st = dict(self.state)
+        st["link"] = self.link is not None and not self.link.closed
+        st["busy"] = self.busy
+        self.on_state(st)
+
+    def _set_and_check(self, build, value, get, want, what):
+        for attempt in range(1, TRIES + 1):
+            self.log(f"settings: {what} (try {attempt})")
+            self.link.request(build, value)
+            end = time.monotonic() + SET_GAP_S
+            while time.monotonic() < end:
+                if flag(self.link.get(get)) == want:
+                    time.sleep(max(0.0, end - time.monotonic()))  # the display may still be re-plugging
+                    return True
+                time.sleep(0.5)
+        self.log(f"settings: {what} did not read back")
+        return False
+
+    def _apply(self, view):
+        st = self._read()
+        if view == "steady" and self.glasses.steady_6dof:
+            self._steady_on(st)
+        elif self.glasses.managed:
+            # 3DoF: the app tracks the head, so the glasses' own hold must be off (Pocket XR's once-per-link auto-off).
+            if st["anchor"] == 1:
+                self._set_and_check(c.anchor_set, False, c.ANCHOR_GET, 0, "Spatial Anchor off for 3DoF")
+            if st["ultrawide"] == 1:
+                self._set_and_check(c.ultrawide_set, False, c.ULTRAWIDE_GET, 0, "Ultrawide off for 3DoF")
+            self._keep_follow()
+            self._depth(fresh=True)
+        else:
+            if view != "steady" and st.get("ultrawide") == 1 and self.we_set_ultrawide:
+                if self._set_and_check(c.ultrawide_set, False, c.ULTRAWIDE_GET, 0, "Ultrawide off"):
+                    self.we_set_ultrawide = False
+                if not self.glasses.app_anchor:
+                    self.on_message(tr(TURN_OFF_6DOF))
+            if view != "steady":
+                self._depth(fresh=True)
+        self._read()
+
+    def _depth(self, fresh=False):
+        """3D side by side for the Space (each eye its own view, windows at a real depth), or 2D if the user turned it off."""
+        if self.wanted == "steady" or self.link is None or self.link.closed:
+            return
+        st = self._read()
+        if st.get("ultrawide") == 1:
+            return  # Ultrawide is the user's (from the glasses' menu); any 3D request would switch it off
+        if not self.want_3d():
+            if st["stereo"] == 1 and self.we_set_3d:
+                if self._set_and_check(c.stereo_set, False, c.STEREO_GET, 0, "2D (3D turned off)"):
+                    self.we_set_3d = False
+            return
+        if st["stereo"] == 1:
+            return
+        if not fresh and self.sbs_tries >= SBS_TRIES:
+            return  # asked already; the mode is the user's now
+        if fresh and self.sbs_tries >= SBS_TRIES and self.sbs_first_at is not None:
+            return
+        wait = FOLLOW_SETTLE_S - (time.monotonic() - self.follow_sent_at)
+        if wait > 0:
+            time.sleep(wait)
+        self.sbs_tries += 1
+        if self.sbs_first_at is None:
+            self.sbs_first_at = time.monotonic()
+        if self._set_and_check(c.stereo_set, True, c.STEREO_GET, 1, f"3D side by side (ask {self.sbs_tries})"):
+            self.we_set_3d = True
+
+    def _keep_3d(self):
+        """If the glasses drop 3D straight after taking it (the Aura can, 1 to 5 s after a plug-in), ask once more."""
+        if self.sbs_first_at is None or time.monotonic() - self.sbs_first_at > SBS_DROP_WINDOW_S:
+            return
+        if self.sbs_tries < SBS_TRIES and self.want_3d() and self.wanted != "steady":
+            self._depth()
+
+    def _keep_follow(self):
+        """In Window in space on the Aura: Follow mode, so the glasses do not hold the picture against the app's tracking."""
+        self.last_follow_check = time.monotonic()
+        if not self.glasses.managed or self.wanted == "steady" or self.link is None or self.link.closed:
+            return
+        if self.follow_tries >= FOLLOW_TRIES or self.state.get("ultrawide") == 1:
+            return
+        mode = flag(self.link.get(c.SPACE_MODE_GET))
+        self.state["space"] = mode
+        if mode == c.SPACE_FOLLOW:
+            return
+        self.follow_tries += 1
+        self.log(f"settings: the glasses are in hover; Follow mode (try {self.follow_tries})")
+        self.link.request(c.follow)
+        self.follow_sent_at = time.monotonic()
+        time.sleep(FOLLOW_READ_S)
+        mode = flag(self.link.get(c.SPACE_MODE_GET))
+        self.state["space"] = mode
+        if mode == c.SPACE_FOLLOW:
+            self.log("settings: Follow mode holds")
+        else:
+            time.sleep(max(0.0, FOLLOW_RETRY_S - FOLLOW_READ_S))
+        self._publish()
+
+    def _steady_on(self, st):
+        self.on_message(tr("Setting up Steady mode in 6DoF..."))
+        if st["stereo"] == 1 and not self._set_and_check(c.stereo_set, False, c.STEREO_GET, 0, "2D, on the way to Ultrawide"):
+            self.on_message(tr("The glasses stayed in 3D, so Steady mode could not start."))
+            return
+        if self.steady_wide and st["ultrawide"] != 1:
+            if not self._set_and_check(c.ultrawide_set, True, c.ULTRAWIDE_GET, 1, "Ultrawide on"):
+                self.on_message(tr("Ultrawide did not come on, so Steady mode could not start."))
+                return
+            self.we_set_ultrawide = True
+        st = self._read()
+        top, size = st.get("size_max"), st.get("size")
+        if self.steady_wide and top is not None and size is not None and size < top - SIZE_SAME:
+            self.log(f"settings: screen size {size:.2f} -> {top:.2f}")
+            self.link.request(c.size_set, float(top))
+            time.sleep(SET_GAP_S)
+        if self.glasses.app_anchor:
+            if self._read()["anchor"] != 1:
+                if not self._set_and_check(c.anchor_set, True, c.ANCHOR_GET, 1, "Spatial Anchor on"):
+                    self.on_message(tr(SPATIAL_ANCHOR_FAILED))
+                    return
+                self.we_set_anchor = True
+            self.on_message(tr("Steady mode in 6DoF is on. The glasses hold the screen in place as you move."))
+        else:
+            self.on_message(tr(TURN_ON_6DOF))
+
+    def _restore(self):
+        if self.link is None or self.link.closed:
+            return
+        st = self._read()
+        changed = False
+        if st["anchor"] == 1 and (self.we_set_anchor or (self.glasses.managed and self.wanted == "steady")):
+            self._set_and_check(c.anchor_set, False, c.ANCHOR_GET, 0, "Spatial Anchor off")
+            changed = True
+        if st["ultrawide"] == 1 and (self.we_set_ultrawide or (self.glasses.managed and self.wanted == "steady")):
+            self._set_and_check(c.ultrawide_set, False, c.ULTRAWIDE_GET, 0, "Ultrawide off")
+            changed = True
+            if not self.glasses.app_anchor and self.glasses.steady_6dof:
+                self.on_message(tr(TURN_OFF_6DOF))
+        if st["stereo"] == 1 and self.we_set_3d:
+            self._set_and_check(c.stereo_set, False, c.STEREO_GET, 0, "2D")
+            changed = True
+        self.we_set_anchor = self.we_set_ultrawide = self.we_set_3d = False
+        self._read()
+        if not changed:
+            return
+        # Held a moment after a change, as Pocket XR does, so the glasses keep it (the One dropped app-set modes).
+        time.sleep(2.0)
+
+    def close(self):
+        self.stop = True
+        if self.link:
+            self.link.close()
