@@ -127,3 +127,20 @@ Windows 11 Pro (26200), Radeon RX 9070 XT, two Sceptre M24 monitors at 1920x1080
   drawn on its panel. Side by side drawing (two eyes) checked in a test window. Saved frames were looked at.
 - **Not proven:** anything with real glasses. The USB network, the stream, the "XREAL 1 Ultra" display, the picture
   in the glasses, the steadiness of a held window, the pointer push-back from the glasses' display, 3D, `--settings`.
+
+### 15 November 2026, the Aura on a USB data port of this PC (no video)
+
+- **USB:** Windows lists the XREAL Aura (3318:043A) as a composite device.
+- **Network link: proven.** Windows picked its own NCM driver with no setup: adapter "UsbNcm Host Device", address
+  169.254.2.10 from the glasses' DHCP. The ECM function ("CDC ECM") shows an error in Device Manager, as expected:
+  Windows has no ECM driver. It is not needed.
+- **The Aura starts its USB network with no video going to it.**
+- **Sensor stream: proven.** 7993 reports in 7.99 s of the glasses' clock, 1000 a second, from 169.254.2.1:52998,
+  no bytes skipped, no wrong lengths. Gravity reads mostly along +y, as on the Deck and the phone.
+- **Head tracking in the app:** in a test window on the PC, 180 frames a second with 1000 reports a second for 15 s;
+  yaw and pitch moved with the glasses. The gyro zero was not learnt in that run: the glasses were never still for
+  two seconds.
+- **Also seen:** a "UVC Camera 0" node on the Aura. Not opened, not used.
+- **Nothing was sent to the glasses.**
+- **Still not proven:** whether a window looks still to someone wearing the glasses (needs the picture in the
+  glasses, so USB-C video), the "XREAL 1 Ultra" display on Windows, the pointer push-back, 3D, `--settings`.
