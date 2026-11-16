@@ -337,8 +337,8 @@ class App:
                     self._pointer_home()
                 t0 = time.perf_counter()
                 self.frame()
-                if not self.window.vsync or time.perf_counter() - t0 < 0.002:
-                    time.sleep(0.004)  # a swap that did not wait (window covered): do not spin
+                if not self.window.vsync or time.perf_counter() - t0 < 0.001:
+                    time.sleep(0.002)  # a swap that did not wait (window covered): do not spin
             else:
                 time.sleep(0.2)
             if now - last_stats >= 5.0:

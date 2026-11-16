@@ -108,4 +108,16 @@ but runs only with `--settings`, and only after Mike says so. Never 10079, never
 
 ## Test results
 
-None yet.
+### 15 November 2026, this PC, no glasses plugged in
+
+Windows 11 Pro (26200), Radeon RX 9070 XT, two Sceptre M24 monitors at 1920x1080 and 180 Hz, Python 3.12.6.
+
+- **Offline tests:** 13 pass (`tests/test_offline.py`): the stream framer, the fusion's directions and zero learning,
+  the control link's bytes against Pocket XR's, the refused ids, the USB id rules.
+- **Displays:** both monitors are listed with their own names, places and refresh rates.
+- **Capture:** each monitor is read at 57 pictures a second (the limit is 60), 1920x1080.
+- **Drawing:** in a test window, and full screen on the second monitor standing in for the glasses, with a made-up
+  head turn: about 150 to 170 frames a second, the main screen straight ahead, the second beside it, the pointer
+  drawn on its panel. Side by side drawing (two eyes) checked in a test window. Saved frames were looked at.
+- **Not proven:** anything with real glasses. The USB network, the stream, the "XREAL 1 Ultra" display, the picture
+  in the glasses, the steadiness of a held window, the pointer push-back from the glasses' display, 3D, `--settings`.
