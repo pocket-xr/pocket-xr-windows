@@ -52,6 +52,10 @@ public sealed class VirtualDisplays : IDisposable
         IoctlPing = Ctl(0x888), IoctlGetVersion = Ctl(0x8FF);
 
     private readonly SafeFileHandle device;
+    /// <summary>Parsec: a second connection to the driver for the keep-alive alone. Adding a display takes Parsec about
+    /// 3 s, and a keep-alive sent on the same connection waited behind it; Parsec then dropped a screen (seen on the
+    /// Steam Deck, 17 Nov 2026: keep-alives 2.6 s late, a screen gone 3 s later).</summary>
+    private SafeFileHandle? pingDevice;
     private readonly Kind kind;
     private readonly List<Screen> screens = new();
     private readonly Thread? watchdog;
@@ -180,7 +184,9 @@ public sealed class VirtualDisplays : IDisposable
     /// </summary>
     private static VirtualDisplays? MakeParsec(SafeFileHandle h, int count, out string why)
     {
-        var made = new VirtualDisplays(h, Kind.Parsec, ParsecKeepAliveMs);
+        SafeFileHandle? second = Open(ParsecInterface, true, out _);
+        var made = new VirtualDisplays(h, Kind.Parsec, ParsecKeepAliveMs) { pingDevice = second };
+        if (second == null) Log.P("virtual displays: Parsec: no second connection for the keep-alive; sharing the first");
         var known = new HashSet<string>(Displays.List().ConvertAll(d => d.GdiName));
         for (int i = 0; i < count; i++)
         {
@@ -232,6 +238,13 @@ public sealed class VirtualDisplays : IDisposable
 
     private void Ping()
     {
+        if (disposed) return;
+        if (kind == Kind.Parsec && pingDevice is SafeFileHandle own)
+        {
+            // Its own connection: never waits behind an add or a remove.
+            ParsecIo(own, ParsecUpdate, null);
+            return;
+        }
         lock (gate)
         {
             if (disposed) return;
@@ -258,6 +271,8 @@ public sealed class VirtualDisplays : IDisposable
             }
             screens.Clear();
             device.Dispose();
+            watchdog?.Join(500);
+            pingDevice?.Dispose();
         }
     }
 

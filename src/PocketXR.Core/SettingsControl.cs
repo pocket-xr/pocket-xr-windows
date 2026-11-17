@@ -164,7 +164,20 @@ public sealed class SettingsControl
     public void Apply() => Enqueue(Job.Apply);
 
     /// <summary>Puts the glasses back for normal use, then calls [done] (on the settings thread).</summary>
-    public void Restore(Action done) => Enqueue(Job.Restore(done));
+    public void Restore(Action done)
+    {
+        // Quitting: setting the glasses up no longer matters, and must not run first. Seen on Windows, 17 Nov 2026:
+        // the glasses reconnected a second before a quit, the set-up queued then asked for 3D after the quit.
+        lock (jobsLock)
+        {
+            leaving = true;
+            jobs.RemoveAll(j => j.Kind == JobKind.Apply || j.Kind == JobKind.Steady);
+            jobs.Insert(0, Job.Restore(done));
+        }
+    }
+
+    /// <summary>The glasses are being put back for a quit: a new link sets nothing up.</summary>
+    private bool leaving;
 
     /// <summary>
     /// Queues entering or leaving Steady mode. State.Steady turns true when the whole sequence has completed, and
@@ -297,7 +310,9 @@ public sealed class SettingsControl
         sbsTriesUsed = 0;
         sbsFirstAt = null;
         Read();
-        if (queueApply) Enqueue(Job.Apply);
+        bool quitting;
+        lock (jobsLock) quitting = leaving;
+        if (queueApply && !quitting) Enqueue(Job.Apply);
         return true;
     }
 

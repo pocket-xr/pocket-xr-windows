@@ -132,24 +132,56 @@ public static class Displays
         // so the pointer leaving them by any edge finds nothing there. (Below them, as on the Mac, was found in the way
         // on the Steam Deck, 17 Nov 2026: going down off a floating screen landed on it.)
         if (glasses != null) places.Add((glasses, own.X - glasses.Width, own.Y));
-        bool changed = false, ok = true;
-        foreach ((DisplayInfo d, int x, int y) in places)
-        {
-            if (d.X == x && d.Y == y) continue;
-            var mode = new DevMode { dmSize = (ushort)Marshal.SizeOf<DevMode>() };
-            if (!EnumDisplaySettingsW(d.GdiName, -1, ref mode)) { ok = false; continue; } // ENUM_CURRENT_SETTINGS
-            mode.dmPositionX = x;
-            mode.dmPositionY = y;
-            mode.dmFields = 0x20; // DM_POSITION
-            int r = ChangeDisplaySettingsExW(d.GdiName, ref mode, IntPtr.Zero, 0x01 | 0x10000000, IntPtr.Zero); // CDS_UPDATEREGISTRY | CDS_NORESET
-            if (r != 0) { ok = false; Log.P($"displays: {d.GdiName} not moved: error {r}"); }
-            changed = true;
-        }
-        if (!changed) return ok;
-        int applied = ChangeDisplaySettingsExW(null, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero);
-        Log.P($"displays: floating screens placed beside this PC's screen, the glasses' display to its left: {(applied == 0 && ok ? "done" : $"error {applied}")}");
-        return applied == 0 && ok;
+        if (places.TrueForAll(p => p.Display.X == p.X && p.Display.Y == p.Y)) return true;
+        bool ok = MoveDisplays(places);
+        Log.P($"displays: floating screens placed beside this PC's screen, the glasses' display to its left: {(ok ? "done" : "not done")}");
+        return ok;
     }
+
+    /// <summary>
+    /// Moves displays to new places on the desktop through Windows' display configuration (the paths and modes that
+    /// are on now, with new positions, applied together). The older way (ChangeDisplaySettingsEx) applies every
+    /// display's saved place from the registry, and a display added a moment before has none yet: on the Steam Deck
+    /// (17 Nov 2026) a new floating screen went 1.5 s after each first move.
+    /// </summary>
+    private static bool MoveDisplays(List<(DisplayInfo Display, int X, int Y)> places)
+    {
+        if (GetDisplayConfigBufferSizes(QdcOnlyActivePaths, out uint pathCount, out uint modeCount) != 0) return false;
+        var paths = new byte[Math.Max(pathCount, 1) * PathSize];
+        var modes = new byte[Math.Max(modeCount, 1) * ModeSize];
+        int result = QueryDisplayConfig(QdcOnlyActivePaths, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
+        if (result != 0)
+        {
+            Log.P($"displays: the display configuration could not be read: error {result}");
+            return false;
+        }
+        int moved = 0;
+        for (int i = 0; i < pathCount; i++)
+        {
+            var path = new ReadOnlySpan<byte>(paths, i * PathSize, PathSize);
+            long sourceAdapter = BitConverter.ToInt64(path[..8]);
+            uint sourceId = BitConverter.ToUInt32(path[8..12]);
+            uint sourceMode = BitConverter.ToUInt32(path[12..16]);
+            if (sourceMode >= modeCount) continue;
+            string gdi = DeviceString(GetSourceName, 84, sourceAdapter, sourceId, 20, 32);
+            int at = places.FindIndex(p => p.Display.GdiName == gdi);
+            if (at < 0) continue;
+            int offset = (int)sourceMode * ModeSize;
+            if (BitConverter.ToUInt32(modes, offset) != ModeInfoSource) continue;
+            BitConverter.TryWriteBytes(modes.AsSpan(offset + 28, 4), places[at].X);
+            BitConverter.TryWriteBytes(modes.AsSpan(offset + 32, 4), places[at].Y);
+            moved++;
+        }
+        if (moved == 0) return false;
+        // Apply what is given, keep it for next time, and let Windows adjust where it must.
+        const uint SdcApply = 0x80, SdcUseSuppliedDisplayConfig = 0x20, SdcSaveToDatabase = 0x200, SdcAllowChanges = 0x400;
+        int set = SetDisplayConfig(pathCount, paths, modeCount, modes, SdcApply | SdcUseSuppliedDisplayConfig | SdcSaveToDatabase | SdcAllowChanges);
+        if (set != 0) Log.P($"displays: Windows would not move the displays: error {set}");
+        return set == 0;
+    }
+
+    [DllImport("user32.dll", EntryPoint = "SetDisplayConfig")]
+    private static extern int SetDisplayConfig(uint pathCount, [In] byte[] paths, uint modeCount, [In] byte[] modes, uint flags);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct DevMode
