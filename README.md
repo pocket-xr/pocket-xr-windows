@@ -1,40 +1,88 @@
-# Pocket XR for Windows (prototype)
+# Pocket XR for Windows
 
-Your PC's screens on your XR glasses, as windows held still in space while you turn your head.
+Your PC's apps on your XR glasses, as screens held still in space while you turn your head.
 
 It is the Windows version of [Pocket XR](https://github.com/pocket-xr/pocket-xr), the free and open source spatial
-desktop for Android phones, and a sibling of Pocket XR for Steam Deck. GPL-3.0, no account, no paid tier.
+desktop for Android phones, and a sibling of Pocket XR for Steam Deck and Pocket XR for Mac. Same glasses, same
+rules, no account and no paid tier.
 
-**This is a prototype, not a release.** See [docs/PLAN.md](docs/PLAN.md) for what is proven and what is only built.
+> **Not released, and not finished.** See "Where it stands" below before believing anything else on this page.
+> Only the XREAL Aura has been used with it, and only its head tracking and its USB network link: this PC has no
+> USB-C port that carries video, so the picture in the glasses has never been seen from Windows.
 
-## Run
+## How it is meant to work
 
-Needs Windows 11 and Python 3.10 or newer. Nothing else is installed.
+Pocket XR adds 1 to 3 screens to your PC, beside its own screen. Move the pointer off the edge and it is on them:
+drag apps there, click and type as usual. In your glasses, those screens float in front of you and stay put as you
+turn your head. With glasses that do 3D side by side, they sit at a real depth.
+
+Pocket XR lives in the notification area (the icons by the clock), under a small pair of glasses. A click opens the
+**control panel**; a right click opens the menu.
+
+- **Control panel**: what is plugged in, a map of the displays (click a screen to send the pointer there), a pad to
+  drag the screens about and scroll to resize them, saved arrangements, the layout (side by side, main + side,
+  stacked, theater), size, distance and curve, 3D and Steady mode.
+- **Settings**: a live picture of your Space, eye distance, brightness, the glow around the screen you look at, edge
+  fade, tracking (Body Anchor or Smooth Follow), head scroll, the tracking readings, a Glasses report, settings saved
+  to and restored from a file, open when you sign in.
+- **Tour**: eight steps, opens the first time.
+- **Launcher** (Ctrl+Alt+Space), **Pocket mode** (Ctrl+Alt+K), a **game controller** as a remote.
+- Every control has a key that works in any app, all with Ctrl+Alt: R recentre, S Steady mode, = and - size,
+  ] and [ distance, . and , curve, L next layout, D 3D, P pointer to the screen you look at, Space the launcher,
+  K Pocket mode, H hand tracking.
+
+## What it needs
+
+- Windows 10 (2004) or Windows 11, 64-bit.
+- A USB-C port that carries video (DisplayPort alternate mode), or an adapter that gives the glasses both video and
+  USB data. Without video the glasses show nothing; head tracking still works.
+- For the floating screens: a **virtual display driver**. Windows has no way for an app to add a monitor by itself;
+  it takes a driver, and a driver takes an administrator to install once. Pocket XR does not carry its own driver
+  yet. It uses [SudoVDA](https://github.com/SudoMaker/SudoVDA) (SudoMaker's Virtual Display Adapter, the one Apollo
+  installs) when it is on the PC. Pocket XR itself never asks for administrator rights.
+
+## Build
+
+Needs the .NET 8 SDK.
 
 ```
-python -m pocketxr.probe      does Windows see the glasses, their display and their sensor stream?
-python -m pocketxr            the PC's screens in space on the glasses
-python -m pocketxr --window --fake      a test window on the PC, with a made-up head turn, no glasses
-python tests\test_offline.py  checks that need no glasses
+dotnet run --project src/PocketXR.Checks
 ```
 
-Keys, from anywhere:
+runs the checks of the shared logic (the same checks as Pocket XR for Mac; no glasses needed). Then:
 
-| Key | What it does |
-| --- | --- |
-| Ctrl+Alt+R | Recentre: the main screen comes in front of you |
-| Ctrl+Alt+Up / Down | Bigger / smaller |
-| Ctrl+Alt+PgUp / PgDn | Further / nearer (seen in 3D) |
-| Ctrl+Alt+1 / 2 / 3 | How many screens are shown |
-| Ctrl+Alt+D | 3D side by side on or off (only with `--settings`) |
-| Ctrl+Alt+Q | Quit |
+```
+dotnet build src/PocketXR -c Release
+```
 
-Hold still for a moment now and then: the head tracking learns its zero point while you are still.
+## Check things without the app
 
-## What is sent to the glasses
+```
+PocketXR --usb                  the glasses on USB, the displays, the glasses' network link
+PocketXR --imu-test 20          head tracking alone for 20 s: yaw and pitch, reports a second (only reads)
+PocketXR --driver               is the virtual display driver there and answering (adds no display)
+PocketXR --render-ui FOLDER     every window drawn to PNG files, with no glasses and no window
+PocketXR --render-space OUT.png the Space drawn off screen as the glasses would get it (add --sbs for 3D)
+PocketXR --stand-in 2           a test: monitor 2 stands in for the glasses' display
+```
 
-By default nothing. The sensor stream is only read. With `--settings`, Pocket XR sets the glasses up as the Steam
-Deck version does (Spatial Anchor and Ultrawide off, Follow mode, 3D side by side), reads each change back, and puts
-back what it changed when it quits.
+The log is at `%LOCALAPPDATA%\Pocket XR\pocket-xr.log`; **Send logs to Mike** makes a zip of it in Downloads with
+email addresses, your Windows user name and IP addresses (other than the glasses' own) taken out.
 
-The log is at `%LOCALAPPDATA%\Pocket XR\pocket-xr.log`.
+## What it sends to the glasses
+
+Pocket XR reads the glasses' motion. On the Aura and the One series it also sends the settings Pocket XR on Android,
+the Steam Deck and the Mac have already proven: 2D and 3D, Ultrawide, screen size, Spatial Anchor and follow mode. It
+never sends a firmware command or a guessed one.
+
+## Where it stands
+
+See [docs/PLAN.md](docs/PLAN.md): what was seen working, on what, and when; what is written but has never run with
+glasses; and what is not written yet.
+
+## Licence
+
+GPL-3.0, as Pocket XR. Pocket XR is a community project, not made by or affiliated with XREAL or VITURE.
+
+The first Windows prototype (Python, November 2026) is kept in `pocketxr/` and `tests/` for its test notes; the app is
+in `src/`.

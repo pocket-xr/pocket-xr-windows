@@ -2,3 +2,8 @@ __pycache__/
 *.log
 dist/
 *.png
+bin/
+obj/
+publish/
+.vs/
+*.user

@@ -1,118 +1,198 @@
 # Pocket XR for Windows: plan
 
-Written 15 November 2026, before any test with glasses on Windows. Everything marked **to prove** has to be seen
-working on Mike's PC with his XREAL Aura before it is called done. Test results go at the end.
+Written 16 November 2026. It replaces the plan of 15 November, which was for the Python prototype; that prototype's
+test results are kept at the end, because they are still the only tests made with the glasses on Windows.
+
+Everything marked **to prove** has to be seen working with real glasses before it is called done. Only the XREAL
+Aura has been used with Pocket XR on Windows, and only on a PC with no USB-C video, so nothing here has been seen
+*in* the glasses yet.
 
 ## What it is
 
-Your PC's screens on your XR glasses, as windows held still in space while you turn your head. It is the Windows
-version of Pocket XR, like the Steam Deck and Mac versions: free, open source (GPL-3.0), no account, no paid tier.
-Same glasses, same rules about what is sent to them.
+Your PC's apps on your XR glasses, as screens held still in space while you turn your head: the Windows version of
+Pocket XR, matching Pocket XR for Mac 0.3 feature for feature wherever Windows allows. Free, open source (GPL-3.0),
+no account, no paid tier. Same glasses, same rules about what is sent to them.
 
 ## How it works
 
 ```
- PC screens (real monitors now, virtual displays later)
-        │  Desktop Duplication (DXGI), one per screen, at most 60 pictures a second
+ PC apps live on 1 to 3 floating screens (virtual displays made by a display driver)
+        │  Windows treats them as real monitors: windows, full screen, Win+Shift+arrow all work
         ▼
- One borderless window, full screen on the glasses' own display, one frame per glasses refresh
-        │  each PC screen is a panel in space around the head
+ Desktop Duplication (DXGI), one per floating screen, straight into Direct3D textures; the pointer is drawn in
+        ▼
+ Direct3D 11 renderer, a borderless window over the glasses' own display, one frame per glasses refresh
+        │  each floating screen is a panel in space, around the head
         │  3D side by side when the glasses are at 3840x1080
         ▲
- Head tracking from the glasses (TCP 169.254.2.1:52998, about 1000 reports a second)
+ Head tracking from the glasses (TCP 169.254.2.1:52998 on the Aura and One family), read just before each frame
 ```
 
-**Input needs no tricks.** The real mouse and keyboard keep working on the PC's screens. Desktop Duplication leaves
-the pointer out of its pictures, so Pocket XR draws its own arrow on the panel. The pointer is kept off the glasses'
-own display, where it could not be found.
+Input needs no tricks: the real pointer moves onto a floating screen like onto any monitor.
 
-## The stack, and why
+## The technology, and why
 
 | Choice | Why | Cost |
 | --- | --- | --- |
-| Python 3 with `ctypes`, no packages | This PC has Python 3.12 and no C++ or .NET build tools. The Deck's tracking, sensor, control and Space code is Mike's own Python, tuned on his Aura, and moves over unchanged. | Not how a finished Windows app ships. A release would be a frozen .exe (PyInstaller) or a rewrite in C# or C++. |
-| OpenGL through `opengl32.dll` | The Deck draws this way; the drawing code ports as it is. | Captured pictures cross from Direct3D to OpenGL through memory (about 8 MB a picture at 1080p). Fine at 60 a second; a Direct3D renderer would avoid it. |
-| DXGI Desktop Duplication | In Windows since 8, no permission prompt, no yellow border, works on virtual displays too. | Whole screens only. Single app windows need Windows.Graphics.Capture, later. |
+| **C# on .NET 8** | One language for the shared logic, the windows and the Direct3D renderer. The Mac's Swift logic ports to it nearly line for line, with its checks. Builds with the free .NET SDK alone, no Visual Studio. | A release is one .exe of about 70 MB that carries .NET with it (or a small one that needs the .NET 8 Desktop Runtime). |
+| **WPF, built in code** | Windows' most settled toolkit; draws exactly what it is told (the look is custom throughout); can draw any window to a picture file with no window, which is how the design is reviewed without glasses. | Not the newest toolkit (WinUI 3), but that one cannot draw off screen and is harder to ship. |
+| **Direct3D 11** (through Vortice, MIT) | What Desktop Duplication hands its pictures to with no copy; a flip-model swap chain with a waitable object gives one frame of latency. The Mac's Metal shaders port one for one. | None worth naming. |
+| **DXGI Desktop Duplication** | In Windows since 8, no permission prompt, no yellow border, works on virtual displays. The prototype read each monitor at 57 pictures a second with it. | Whole displays only; the pointer has to be drawn in by Pocket XR. |
+| **An existing virtual display driver** (SudoVDA first) | See the next section. | One install by an administrator, of someone else's driver. |
 
-## Extra screens
+The first prototype was Python with no packages, because the PC had no build tools. It proved the glasses' network
+link and tracking on Windows. It is not how an app for PC users ships, so the app is now C#; the prototype stays in
+`pocketxr/` for its notes.
 
-Windows has no way for an app to add a monitor by itself. It needs an indirect display driver (IDD).
+## Floating screens need a driver (the part that needs an administrator)
+
+Windows has no way for an app to add a monitor. It takes an *indirect display driver*, and:
+
+| | Needs |
+| --- | --- |
+| Installing any driver | An administrator, once. |
+| A driver Windows will load on an ordinary PC | A signature Windows trusts: Microsoft's own (through its hardware programme, which needs an EV certificate, a few hundred dollars a year) or an open source foundation's. |
+| A driver built at home | "Test-signing mode", a switch that weakens Windows' security for the whole PC and upsets some games' anti-cheat. Not something to ask of users. |
+
+So Pocket XR does not carry its own driver yet. The ways, in order:
+
+1. **Use a driver the person installs** (now). Pocket XR talks to **SudoVDA** (SudoMaker's Virtual Display Adapter,
+   MIT / CC0; the one the Apollo game streaming host installs). It adds a display when asked and takes it away again
+   when asked, or by itself a few seconds after the app that asked stops answering, so a crash never leaves a display
+   behind. Unlike macOS, displays can be added and removed while Pocket XR runs, so changing the number of screens
+   needs no restart. Pocket XR itself never needs administrator rights. **To prove**: adding a display, and capturing
+   it. Checked so far (16 November, this PC, where SudoVDA is already installed): the driver opens and answers its
+   version with no administrator rights. No display was added.
+2. **MTT's Virtual Display Driver** (MIT, signed through the SignPath Foundation) as a second choice, later: it is
+   set up through a settings file rather than asked for displays on demand.
+3. **Pocket XR's own driver**, later, if the project gets a signing certificate. Weeks of work and a yearly cost.
+4. **With no driver at all**: Pocket XR can still show the PC's real screens in the glasses (what the prototype did).
+   Not built into the new app yet, except as the `--stand-in` test.
+
+## What else needs care on Windows
+
+| Thing | State |
+| --- | --- |
+| Administrator rights | Never asked for. Shortcuts (RegisterHotKey), the tray icon, capture, the glasses' network and "open when I sign in" (the person's own Run key) all work without. |
+| Permissions | None. Windows has no Screen Recording or Accessibility prompts for this. |
+| The glasses' network | Windows 11 picks its own driver ("UsbNcm Host Device") with no setup. **Seen working** with the Aura, 15 November. Windows 10 has no such driver in the box: **to check**. |
+| Code signing | An unsigned .exe gets a SmartScreen warning. The plan is the same Azure signing as the PC VR helper. |
+| Ctrl+Alt shortcuts | On some keyboard layouts Ctrl+Alt is AltGr, which types symbols. If that clashes, the shortcuts can be turned off in Settings; choosing other keys is not built yet. |
+| A click by a pinch (hand tracking) | Windows lets an app click for the user (SendInput) without a permission, but not in windows run as administrator. |
+
+## Glasses
+
+| Glasses | Head tracking on Windows | 3D side by side | Notes |
+| --- | --- | --- | --- |
+| XREAL Aura | Seen working (15 November, prototype; the new app: see the results below) | Pocket XR asks for it; **to prove** on Windows | Mike's glasses: the first target |
+| XREAL One, One Pro, One Pro+, 1S | Written, not tried on a PC | Written, not tried on a PC | Follow mode, Stabilizer off, as on Android |
+| XREAL Air family, VITURE | Not written for Windows yet (USB HID) | From the glasses' own menu | The protocols are ported with their checks; the Windows USB reader is not |
+| Other glasses | None: screens shown flat | No | |
+
+What is sent to the glasses is exactly what the Mac and the Deck send, from the same allow list: 2D and 3D,
+Ultrawide, screen size, Spatial Anchor, follow and the canvas recentre. Never 10079, never 10325 to 10328, never a
+guessed id.
+
+## The shared logic
+
+`src/PocketXR.Core` is `Sources/PocketXRCore` from Pocket XR for Mac, file for file, in C#: head fusion and
+prediction, draw smoothing, the still lock, layouts, curve, the display grid, the Steady mode plan and the control
+wire, settings (the same file format, so settings saved on a Mac open on a PC), the tour's steps, launcher search,
+controller mapping, hand gestures and calibration. `src/PocketXR.Checks` is the Mac's `Checks/`, check for check.
+`docs/PORTING.md` has the rules that keep the two readable side by side.
+
+## The windows
+
+All in Pocket XR's look ("Light on glass"), built in code so that `PocketXR --render-ui FOLDER` draws every one to a
+picture with no glasses. `docs/UI.md` describes the look and the shared parts.
+
+- **Control panel**: status, the map of displays, the place pad, arrangements, layout, size, distance, curve, 3D,
+  Steady mode.
+- **Tray icon and its menu**: the Mac's menu bar menu.
+- **Settings window**, **the tour** (eight steps), **the launcher**, **Pocket mode**.
+
+## Order of proof (what Mike can do, and with what)
+
+On this PC (no USB-C video), with the Aura on any USB port:
+
+1. `PocketXR --usb` lists the Aura and its network link.
+2. `PocketXR --imu-test 20` prints yaw and pitch that follow the head, about 1000 reports a second.
+3. The app: the control panel says "XREAL Aura", the dot lights, "Your view" on the pad moves with the head; the
+   settings link opens (the log says so) and Steady mode's switch becomes usable.
+4. `PocketXR --stand-in 2`: the second monitor stands in for the glasses and shows the main screen as a panel that
+   moves against the head. This shows tracking and drawing together, not a screen held still in the glasses.
+
+For the picture in the glasses, one of:
 
 | Way | Cost |
 | --- | --- |
-| **No driver: show the real monitors** | Nothing to install. This is the prototype. The screens are also still on the desk. |
-| **Use an existing open source driver** (Virtual Display Driver, MIT) | One admin install by the user, of someone else's driver. Pocket XR would turn its screens on and off. This PC already has it, and SudoVDA, installed. **Recommended next step.** |
-| Our own driver | Windows Driver Kit, weeks of work, and paid driver signing (an EV certificate or Microsoft's attestation). Not now. |
+| A Windows laptop or handheld with a USB-C port that carries video | Copy the app's folder over; nothing to install but the driver for floating screens. |
+| A DisplayPort to USB-C adapter of the kind sold for USB-C monitors and pen displays (a DisplayPort plug and a USB plug on the PC side, USB-C with power on the other) | An adapter to buy; which ones work with XREAL glasses is **to check** before buying. |
 
-The prototype shows up to three screens that are not the glasses, the main one in the middle. A virtual display that
-is already on shows like any other screen. Turning virtual displays on and off from Pocket XR is the next step, with
-Mike's OK, because it changes the PC's display setup.
-
-## The glasses' network link (the biggest unknown)
-
-The glasses are a composite USB device with two network functions: CDC NCM (169.254.2.x) and CDC ECM (169.254.1.x).
-Windows 11 has its own NCM driver (UsbNcm.sys); it has no ECM driver. So expect one new network adapter,
-"UsbNcm Host Device", with 169.254.2.10 from the glasses' DHCP. Reports differ on whether Windows picks the NCM
-driver by itself for every device, so **to prove**:
-
-1. With the Aura plugged in, Device Manager shows USB 3318:043A and a new network adapter.
-2. The adapter gets a 169.254.2.x address (or any 169.254 address).
-3. `python -m pocketxr.probe` reads the stream and prints about 1000 reports a second.
-
-If Windows does not pick the driver, the fix to try is choosing "UsbNcm Host Device" by hand in Device Manager
-(an admin step, Mike's call).
-
-This PC has several adapters with 169.254 addresses, so Pocket XR does not trust the routing table: it binds its
-sockets to the local address on the glasses' link.
-
-**The picture:** the glasses need DisplayPort over USB-C. Mike, 15 November 2026: this PC has no USB-C port with
-video. So on this PC:
-
-| Way | What it proves | Cost |
-| --- | --- | --- |
-| The Aura on any USB data port | The network link and head tracking (steps 1 and 2). The picture is checked on a monitor standing in for the glasses (`--display 1`). | Nothing. Whether the Aura starts its USB network with no video is itself **to prove**. |
-| A DisplayPort to USB-C adapter that also carries USB data (the kind sold for USB-C monitors and pen displays, with a DisplayPort plug and a USB plug on the PC side) | Everything, on this PC. | An adapter to buy; which ones work with XREAL glasses is **to check** before buying. |
-| A laptop or handheld with USB-C video | Everything, on another Windows machine. | Needs Python 3.10 or newer there. |
-
-## Head tracking
-
-The Deck's `fusion.py`, unchanged: gyro integration, tilt pulled toward gravity, gyro zero learnt only from two
-seconds of real stillness, the first stillness in the first 5 s also recentres. 3DoF only: the Aura gives a PC host
-orientation, not position.
-
-## What is sent to the glasses
-
-By default nothing: the sensor stream is only read. The Deck's settings control (`settingsctl.py`: Spatial Anchor
-off, Ultrawide off, Follow, 3D side by side, each read back, put back on quit) is ported with the same allow list,
-but runs only with `--settings`, and only after Mike says so. Never 10079, never 10325 to 10328, never a guessed id.
-
-## Order of proof
-
-1. **Find the glasses:** USB id, display name, network link, stream rate (`pocketxr.probe`).
-2. **Head tracking:** the probe prints yaw and pitch; they follow the head and hold still.
-3. **One screen in space:** the main screen as a panel on the glasses, with the pointer.
-4. **Space:** several screens, recentre (Ctrl+Alt+R), bigger and smaller, nearer and further.
-5. **2D / 3D:** with `--settings`, the glasses switch to 3840x1080 and each eye gets its own view.
-
-## Risks
-
-| Risk | What happens then |
-| --- | --- |
-| Windows does not bring up the glasses' network | No head tracking until the driver is chosen by hand. First thing tested. |
-| No DisplayPort to the glasses from this PC | Tracking can be proven, the picture only on a monitor standing in for the glasses. |
-| Python too slow for 120 frames a second | Lower capture rate; then the rewrite comes sooner. |
-| The pointer or windows land on the glasses' display | The pointer is pushed back; windows are the user's to move for now. |
-
-## Sources
-
-- Microsoft's list of USB class drivers in Windows (UsbNcm.sys): https://learn.microsoft.com/windows-hardware/drivers/usbcon/supported-usb-classes
-- Microsoft's NCM driver source: https://github.com/microsoft/NCM-Driver-for-Windows
-- Desktop Duplication: https://learn.microsoft.com/windows/win32/direct3ddxgi/desktop-dup-api
-- Virtual Display Driver (MIT): https://github.com/VirtualDrivers/Virtual-Display-Driver
-- XREAL One and Aura stream (MIT): https://github.com/0xcaff/xr-tools
-- Pocket XR for Steam Deck, `docs/FEASIBILITY.md`, and Pocket XR for Mac, `docs/PLAN.md`
+Then: 5. floating screens appear in Windows' display settings; 6. the glasses show them, with the pointer; 7. turning
+the head leaves them in place; 8. 3D; 9. Steady mode; 10. quit puts the glasses back.
 
 ## Test results
+
+### 16 November 2026, the new app on Mike's desktop PC, no glasses plugged in
+
+Windows 11 Pro (26200), Radeon RX 9070 XT, two Sceptre M24 monitors at 1920x1080 and 180 Hz, .NET SDK 8.0.428.
+
+- **Shared logic:** all 965 checks pass (`src/PocketXR.Checks`), the Mac's checks ported one for one.
+- **Build:** the app builds in Release with no warnings.
+- **Windows drawn to pictures** (`PocketXR --render-ui`): 73 pictures of the control panel, tray menu, settings
+  (every pane, and at the smallest size), the tour (every step, and the setup step in each state), the launcher
+  (12 states, made-up apps), Pocket mode and the edge hint. Looked at; words that were untrue on Windows were fixed.
+- **The Space drawn off screen** (`PocketXR --render-space`): 2D, 3D side by side, curved, every layout. The
+  pictures are the right way up, unmirrored, the left eye in the left half, and turning the head moves the panels the
+  right way. So the Mac's maths carries over to Direct3D unchanged.
+- **Capture** (`PocketXR --capture-test`): both monitors captured with no copy through memory, first picture in
+  0.1 s, up to 180 pictures a second (as fast as the screen changes), the pointer's shape received.
+- **The drawing loop**, in a small ordinary window in a corner: 177 frames a second on the 180 Hz monitor, the same
+  with both monitors being captured.
+- **The virtual display driver** (`PocketXR --driver`): SudoVDA opens and answers with no administrator rights
+  (protocol 0.2.1, a test build, watchdog 3 s). **No floating screen was added**: that changes the PC's display set
+  up and waits for Mike's yes (`PocketXR --driver-test`).
+- **USB listing:** the PC's 16 USB devices listed with names; the glasses' detection only seen with no glasses in.
+- **The launcher's app list** (read only): 220 apps from the Start menu and the Store, all with icons. No app was
+  started.
+- **Not run:** anything with the glasses (they were not plugged in), the app itself as a running program (its windows
+  have only been drawn to pictures), a floating screen, Pocket mode, the game controller, USB HID tracking, and the
+  picture in the glasses (no USB-C video on this PC).
+
+### 17 November 2026, the Steam Deck running Windows 11 Home, with the Aura on its USB-C port
+
+Reached over Wi-Fi (`ssh steamdeck`, Windows' OpenSSH Server turned on by Mike); the app is run in Mike's desktop
+session through `scripts/deck.sh` (an SSH login cannot see the desktop).
+
+- **First picture in the glasses from Windows.** The Aura's display ("XREAL 1 Ultra", 1920x1080 at 90 Hz, 3840x1080
+  at 60 Hz in 3D) is a normal Windows display on the Deck.
+- **Head tracking:** 1000 reports a second, nothing dropped (`--imu-test`). In the app, Mike: everything good apart
+  from the points below.
+- **Windows put the glasses in Duplicate** the first time and again after every switch to 3D (the Aura's 3D mode is
+  a new monitor to Windows). Pocket XR now never draws on mirrored glasses, and asks Windows to extend (as Win+P,
+  Extend; Mike said yes): done in a few milliseconds each time.
+- **The Deck's own screen** (shown when there are no floating screens) is turned in hardware (Rotate270); it is
+  turned back when drawn. Mike: the picture right way up; the arrow looked turned and a little off (fixed, not yet
+  looked at again).
+- **Floating screens through Parsec's Virtual Display Adapter**, already installed on the Deck, with no
+  administrator rights: 3 screens of 1920x1080 at 60 Hz, added in about 3 s each, captured and drawn in 3D. Placed
+  to the right of the Deck's screen, laid out as in the glasses; Mike: crossing onto them works. Going down off them
+  landed on the glasses' display (now moved to the left of the Deck's screen; not yet tried).
+- **The Aura drops off the Deck's USB** (USB and network gone, display stays): first seen about 8 s after switches to
+  3D, then in 2D with nothing sent, and then with Pocket XR not running at all (on 35 s, off 30 s, on again). So it
+  is not Pocket XR. The Deck was on battery (52 %), the Aura powered from its one USB-C port. Next to try: a powered
+  USB-C hub or dock, the cable reseated, the glasses cooled.
+- **After charging the Deck to 98 % and plugging the Aura in directly:** no drop in 75 s with Pocket XR quit, nor
+  in three runs of the app through the switch to 3D. So the drops were most likely power on a low battery (not proven).
+- **Parsec's screens went** 6 s after they were made in one run (keep-alive from the shared thread pool, and Parsec's
+  own service runs on the Deck). Now a dedicated keep-alive thread every 30 ms, a second look before a screen counts as
+  gone, and screens made again (3 times in 2 minutes at most). Clean start seen at 10:05: 2 screens, 3D, no remake.
+- **Windows started remotely came up behind other windows**; they are now put on top for a moment when Windows will
+  not bring them forward. Seen on the Deck: the tour in front, the control panel behind it.
+- Mike, 17 Nov: crossing onto the floating screens works; "all good".
+
+## The Python prototype's test results (15 November 2026)
 
 ### 15 November 2026, this PC, no glasses plugged in
 
