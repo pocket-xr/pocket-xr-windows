@@ -1,10 +1,10 @@
-# Pocket XR for Windows 0.1.0 (preview)
+# Pocket XR for Windows 0.1.0
 
 Your PC's apps on your XR glasses, as screens floating in front of you that stay put as you turn your head. Free and
 open source (GPL-3.0), no account, no paid tier. The Windows version of Pocket XR, with the Android, Steam Deck and Mac
 versions.
 
-**This is a preview.** It has been used with one pair of glasses on one PC: the **XREAL Aura on a Steam Deck running
+**A first version.** It has been used with one pair of glasses on one PC: the **XREAL Aura on a Steam Deck running
 Windows 11** (17 November 2026). There it showed floating screens in the glasses, held still by head tracking, in 3D.
 Nothing else has been tried yet. If you try it with other glasses or another PC, please use **Send logs to Mike** in
 the menu, whether it works or not.
