@@ -28,6 +28,7 @@ public static class Tools
         if (Want("settings")) SettingsWindow.Pictures(folder);
         if (Want("tour")) TourWindow.Pictures(folder);
         if (Want("launcher")) Launcher.Pictures(folder);
+        if (Want("driver")) DriverHelp.Pictures(folder);
         if (Want("pocket"))
         {
             PocketMode.Pictures(folder);

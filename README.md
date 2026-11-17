@@ -6,9 +6,9 @@ It is the Windows version of [Pocket XR](https://github.com/pocket-xr/pocket-xr)
 desktop for Android phones, and a sibling of Pocket XR for Steam Deck and Pocket XR for Mac. Same glasses, same
 rules, no account and no paid tier.
 
-> **Not released, and not finished.** See "Where it stands" below before believing anything else on this page.
-> Only the XREAL Aura has been used with it, and only its head tracking and its USB network link: this PC has no
-> USB-C port that carries video, so the picture in the glasses has never been seen from Windows.
+> **Preview.** Seen working on 17 November 2026 on a Steam Deck running Windows 11 with the XREAL Aura: floating
+> screens in the glasses, held still by head tracking, in 3D. No other glasses, and no other PC, have been tried yet.
+> See "Where it stands" below.
 
 ## How it is meant to work
 
@@ -37,9 +37,12 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - A USB-C port that carries video (DisplayPort alternate mode), or an adapter that gives the glasses both video and
   USB data. Without video the glasses show nothing; head tracking still works.
 - For the floating screens: a **virtual display driver**. Windows has no way for an app to add a monitor by itself;
-  it takes a driver, and a driver takes an administrator to install once. Pocket XR does not carry its own driver
-  yet. It uses [SudoVDA](https://github.com/SudoMaker/SudoVDA) (SudoMaker's Virtual Display Adapter, the one Apollo
-  installs) when it is on the PC. Pocket XR itself never asks for administrator rights.
+  it takes a driver, and a driver takes an administrator to install once. Pocket XR uses
+  **Parsec's Virtual Display Driver**: free, from Parsec Cloud, no Parsec app or account needed. Pocket XR shows how
+  to get it ("Add floating screens", in the control panel), and notices it by itself once it is installed. It can
+  also be installed with `winget install --id Parsec.ParsecVDD -e`. SudoVDA (the driver the Apollo streaming app
+  installs) works too. Without a driver, the glasses show the PC's own screen. Pocket XR itself never asks for
+  administrator rights, and is not made by or affiliated with Parsec.
 
 ## Build
 

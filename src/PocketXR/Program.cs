@@ -42,6 +42,9 @@ public static class Program
                     case "--capture-test":
                         return Render.RenderTools.CaptureTest(args.Length > 1 && double.TryParse(args[1], out double c) ? c : 3);
                     case "--driver": return Tools.Driver();
+                    case "--make-icon":
+                        new System.Windows.Application();
+                        return AppIcon.Make(args.Length > 1 ? args[1] : "PocketXR.ico");
                     case "--driver-test": return Tools.DriverTest(args.Length > 1 && double.TryParse(args[1], out double d) ? d : 8);
                     default:
                         Console.Error.WriteLine($"Pocket XR does not know {args[0]}.");

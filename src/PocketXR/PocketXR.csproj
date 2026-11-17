@@ -12,12 +12,15 @@
     <UseWindowsForms>false</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\PocketXR.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <Product>Pocket XR</Product>
     <AssemblyTitle>Pocket XR</AssemblyTitle>
     <Company>Pocket XR</Company>
     <Copyright>GPL-3.0</Copyright>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- A release is one .exe: no separate debugging files beside it. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
   </PropertyGroup>
 
   <ItemGroup>

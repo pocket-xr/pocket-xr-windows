@@ -203,8 +203,10 @@ public interface IAppActions
     void ImportSettings();
     /// <summary>Opens Windows' own display settings.</summary>
     void OpenDisplaySettings();
-    /// <summary>Opens the page that tells how to get the virtual display driver floating screens need.</summary>
+    /// <summary>Opens the window that tells how to get the virtual display driver floating screens need.</summary>
     void OpenDriverHelp();
+    /// <summary>Starts the download of Parsec's virtual display driver in the browser.</summary>
+    void DownloadDriver();
     void RestartApp();
     void Quit();
     /// <summary>Chooses the camera for hand tracking: -1 the glasses' own, else an index into AppState.HandsCameras.</summary>
@@ -248,6 +250,7 @@ public sealed class NoActions : IAppActions
     public void ImportSettings() { }
     public void OpenDisplaySettings() { }
     public void OpenDriverHelp() { }
+    public void DownloadDriver() { }
     public void RestartApp() { }
     public void Quit() { }
     public void ChooseHandsCamera(int index) { }

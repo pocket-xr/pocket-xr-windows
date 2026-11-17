@@ -724,6 +724,7 @@ public sealed class AppController : IAppActions, IDisposable
             Glasses? found = Glasses.Detect(UsbDevices.List());
             if (!Nullable.Equals(found, glasses)) ScreensChanged();
         }
+        LookForDriver();
         TrackPointer();
         PublishDisplayTiles();
         UpdateEdgeHint();
@@ -1119,7 +1120,40 @@ public sealed class AppController : IAppActions, IDisposable
     }
 
     public void OpenDisplaySettings() => Open("ms-settings:display");
-    public void OpenDriverHelp() => Open("https://github.com/SudoMaker/SudoVDA/releases");
+    public void OpenDriverHelp() => ShowWindow(ref driverWindow, () => DriverHelp.Window(State, this), "driver help");
+
+    public void DownloadDriver()
+    {
+        Log.P("driver: download of Parsec's virtual display driver asked for");
+        Open(DriverHelp.DownloadUrl);
+    }
+
+    private PxWindow? driverWindow;
+
+    /// <summary>Every few seconds while there is no driver: is one there now? Then the floating screens are made at
+    /// once, with nothing to restart.</summary>
+    private void LookForDriver()
+    {
+        if (State.DriverReady || ticks % 12 != 0) return;
+        VirtualDisplays.DriverInfo? driver = VirtualDisplays.Probe(out string why);
+        if (driver == null)
+        {
+            State.DriverWhy = why;
+            return;
+        }
+        Log.P($"virtual display driver: found now: {driver.Name}, version {driver.Version}");
+        State.DriverReady = true;
+        State.DriverWhy = "";
+        State.Notify();
+        if (glassesDisplay != null && standIn == null)
+        {
+            // The glasses are showing this PC's screen: their picture is made again, with floating screens.
+            picture?.Dispose();
+            picture = null;
+            glassesDisplay = null;
+            ScreensChanged();
+        }
+    }
 
     private static void Open(string what)
     {
