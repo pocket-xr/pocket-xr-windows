@@ -191,6 +191,11 @@ session through `scripts/deck.sh` (an SSH login cannot see the desktop).
 - **Windows started remotely came up behind other windows**; they are now put on top for a moment when Windows will
   not bring them forward. Seen on the Deck: the tour in front, the control panel behind it.
 - Mike, 17 Nov: crossing onto the floating screens works; "all good".
+- **The 0.1.0 release build on the Deck (10:45 to 10:55):** it starts cleanly, finds Parsec's driver, comes up on top.
+  A new floating screen went 1.5 s after each first placing: the old way of moving displays applied saved registry
+  places. Moved with SetDisplayConfig now: both screens kept, in place, in two runs. With the glasses in, 3D and two
+  floating screens shown at 10:45. Then the Aura dropped off USB again three times with the Deck's battery at 50 %,
+  once with nothing sent: the power, not Pocket XR. To be tried with the Deck on a charger (a dock or powered hub).
 
 ## The Python prototype's test results (15 November 2026)
 
