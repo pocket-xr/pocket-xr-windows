@@ -161,6 +161,16 @@ def test_glasses_detect_windows():
     assert glasses.USB_ID.match(r"USB\VID_3318&PID_043A&MI_02\6&1") is None  # an interface node, not the device
 
 
+def test_glasses_viture_beast():
+    mic = (0x35CA, 0x1102, [], "VITURE Microphone")
+    for pid in (0x1211, 0x1201):
+        g = glasses.detect([mic, (0x35CA, 0x1301, [], "VITURE Pro 2"), (0x35CA, pid, [], "VITURE Beast XR Glasses")])
+        assert g.product == pid and g.beast and g.imu == "viture" and g.axes == "one", hex(pid)
+        assert g.viture_tracking_default() and g.why_no_tracking() is None
+    pro2 = glasses.detect([(0x35CA, 0x1301, [], "VITURE Pro 2")])
+    assert not pro2.beast and pro2.axes == "aura" and not pro2.viture_tracking_default()
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

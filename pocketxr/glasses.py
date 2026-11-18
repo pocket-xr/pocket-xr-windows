@@ -15,10 +15,18 @@ AURA = {0x0439, 0x043A}
 ONE_FAMILY = {0x0435: "XREAL One Pro", 0x0436: "XREAL One Pro", 0x0437: "XREAL One", 0x0438: "XREAL One",
               0x043D: "XREAL 1S", 0x043E: "XREAL 1S", 0x0443: "XREAL One Pro+", 0x0444: "XREAL One Pro+"}
 VITURE_BEAST = 0x1211
+# A second Beast USB id, reported by a tester (November 2026) with the same layout: HID on interface 5.
+VITURE_BEAST_1201 = 0x1201
+BEAST_PRODUCTS = frozenset({VITURE_BEAST, VITURE_BEAST_1201})
 VITURE_MICROPHONE = 0x1102
 # The Air models Pocket XR reads (AirImuProtocol): Air, Air 2, Air 2 Pro, Air 2 Ultra.
 AIR_IMU = {0x0424: "XREAL Air", 0x0428: "XREAL Air 2", 0x0432: "XREAL Air 2 Pro", 0x0426: "XREAL Air 2 Ultra"}
 AIR_FAMILY = {0x0423, 0x0424, 0x0425, 0x0426, 0x0427, 0x0428, 0x0431, 0x0432, 0x043F, 0x0440, 0x0441, 0x0442}
+
+
+def is_beast(product):
+    """The VITURE Beast's USB product ids: 0x1211 and 0x1201."""
+    return product in BEAST_PRODUCTS
 
 
 @dataclass(frozen=True)
@@ -47,7 +55,7 @@ class Glasses:
 
     @property
     def beast(self):
-        return self.family == "viture" and self.product == VITURE_BEAST
+        return self.family == "viture" and is_beast(self.product)
 
     @property
     def control_link(self):
@@ -142,7 +150,7 @@ def detect(devices=None):
             return Glasses(AIR_IMU.get(p) or name or "XREAL Air", "air", v, p)
     vit = [(v, p, name) for v, p, _, name in devs if v == VITURE and p != VITURE_MICROPHONE]
     if vit:
-        v, p, name = sorted(vit, key=lambda t: t[1] != VITURE_BEAST)[0]
+        v, p, name = sorted(vit, key=lambda t: not is_beast(t[1]))[0]
         return Glasses(name or tr("VITURE glasses"), "viture", v, p)
     for v, p, cls, name in devs:
         # Any other XREAL device with a CDC network interface takes the network path, as Pocket XR does.

@@ -340,6 +340,14 @@ public static class GlassesChecks
         Glasses? beast = Found(Glasses.VitureBeast, classes: new[] { 0x03 }, vendor: Glasses.Viture);
         Check.That(beast?.Family == GlassesFamily.Viture && beast?.HidImu == true && beast?.SteadyCapable == false, "the VITURE Beast: USB HID, no Steady mode");
         Check.That(beast is Glasses bg && bg.Axes == HeadFusion.Axes.One, "the Beast sends x right, y down, z front");
+        // The Beast also comes as 0x1201 (a tester's, November 2026): the same rules, and it is preferred to a second VITURE id.
+        Glasses? beast1201 = Found(Glasses.VitureBeast1201, classes: new[] { 0x03 }, vendor: Glasses.Viture);
+        Check.That(beast1201?.IsBeast == true && beast1201?.HidImu == true && beast1201?.SteadyCapable == false, "the VITURE Beast 0x1201: USB HID, no Steady mode");
+        Check.That(beast1201 is Glasses b1 && b1.Axes == HeadFusion.Axes.One, "the Beast 0x1201 sends x right, y down, z front");
+        var otherViture = new UsbDeviceInfo(vendor: Glasses.Viture, product: 0x1301, interfaceClasses: new[] { 0x03 }, name: "");
+        Glasses? beastFirst = Found(0x1201, classes: new[] { 0x03 }, vendor: Glasses.Viture, extra: new[] { otherViture });
+        Check.That(beastFirst?.Product == 0x1201, "the Beast 0x1201 is picked over another VITURE id");
+        Check.That(Glasses.IsBeastProduct(0x1211) && Glasses.IsBeastProduct(0x1201) && !Glasses.IsBeastProduct(0x1301) && !Glasses.IsBeastProduct(Glasses.VitureMicrophone), "the Beast's ids are 0x1211 and 0x1201");
         Glasses? viture = Found(0x1301, classes: new[] { 0x03 }, vendor: Glasses.Viture);
         Check.That(viture?.HidImu == true && (viture is Glasses vg && vg.Axes == HeadFusion.Axes.Aura), "other VITURE glasses: as the sensor sends");
 
