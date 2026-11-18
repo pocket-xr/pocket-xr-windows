@@ -215,29 +215,30 @@ public sealed class HandCalibrationView : Grid
 
 /// <summary>
 /// A borderless window over the whole of one floating screen, in front of everything on it. It never takes the
-/// keyboard, and its Cancel can be clicked without making Pocket XR the front app. Not shown on a screen yet: only
-/// its content has been drawn to a picture.
+/// keyboard, and its Cancel can be clicked without making Pocket XR the front app.
 /// </summary>
 public sealed class HandCalibrationWindow
 {
     private readonly Window window;
     private readonly HandCalibrationView view;
 
-    /// <summary>[screen] is the floating screen's place on the desktop, in WPF's units.</summary>
-    public HandCalibrationWindow(Rect screen, Action onCancel)
+    /// <summary>[screen] is the floating screen, as Windows has it.</summary>
+    public HandCalibrationWindow(PocketXR.Platform.DisplayInfo screen, Action onCancel)
     {
         view = new HandCalibrationView(0, onCancel);
         window = new Window
         {
             WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, Topmost = true,
             ShowActivated = false, Background = Theme.Page, WindowStartupLocation = WindowStartupLocation.Manual,
-            Left = screen.Left, Top = screen.Top, Width = screen.Width, Height = screen.Height, Content = view,
+            Left = screen.X, Top = screen.Y, Width = 800, Height = 600, Content = view,
             Title = "Pocket XR hand calibration", UseLayoutRounding = true,
         };
         window.SourceInitialized += (_, _) =>
         {
             IntPtr handle = new WindowInteropHelper(window).Handle;
             SetWindowLongPtr(handle, ExStyle, new IntPtr(GetWindowLongPtr(handle, ExStyle).ToInt64() | NoActivate));
+            // Over the whole floating screen, in its own pixels (it may have another scale than the PC's screen).
+            SetWindowPos(handle, new IntPtr(-1), screen.X, screen.Y, screen.Width, screen.Height, 0x0010);
         };
     }
 
@@ -258,6 +259,9 @@ public sealed class HandCalibrationWindow
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int w, int h, uint flags);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value);

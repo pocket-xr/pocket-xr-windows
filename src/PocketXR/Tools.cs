@@ -182,4 +182,94 @@ public static class Tools
         Console.WriteLine("It answered. No display was added.");
         return 0;
     }
+
+    /// <summary>Hand tracking's detector on a picture file: the hand's 21 points, as 0 to 1 of the picture, run
+    /// twice (the second time following the hand from the first, as it does from frame to frame).</summary>
+    public static int HandsTest(string file)
+    {
+        var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(new Uri(Path.GetFullPath(file)),
+            System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+        var bgra = new System.Windows.Media.Imaging.FormatConvertedBitmap(decoder.Frames[0], System.Windows.Media.PixelFormats.Bgra32, null, 0);
+        int w = bgra.PixelWidth, h = bgra.PixelHeight, stride = w * 4;
+        var pixels = new byte[stride * h];
+        bgra.CopyPixels(pixels, stride, 0);
+        Hands.HandDetector? detector = Hands.HandDetector.Load(out string? error);
+        if (detector == null)
+        {
+            Console.WriteLine($"The hand models could not be loaded: {error}");
+            return 1;
+        }
+        for (int pass = 1; pass <= 2; pass++)
+        {
+            Hands.DetectedHand? hand = detector.Detect(pixels, w, h, stride);
+            Console.WriteLine($"pass {pass}: {(detector.RanPalm ? "palm search" : "followed")}, palm {detector.PalmMs:0} ms, points {detector.MarksMs:0} ms");
+            if (hand == null)
+            {
+                Console.WriteLine("  no hand");
+                continue;
+            }
+            Console.WriteLine(FormattableString.Invariant($"  presence {hand.Presence:0.000}, MediaPipe's label {(hand.LabelRight ? "Right" : "Left")} ({hand.LabelScore:0.00})"));
+            for (int n = 0; n < 21; n++) Console.WriteLine(FormattableString.Invariant($"  {n,2} {hand.Points[n].X:0.0000} {hand.Points[n].Y:0.0000}"));
+            HandPoints p = hand.ToHandPoints((double)w / h, mirrored: false);
+            Console.WriteLine(FormattableString.Invariant($"  pinch ratio {p.PinchRatio:0.00}, side {p.Side?.RawValue() ?? "unknown"}, palm to camera {HandPalm.FacesCamera(p)}"));
+        }
+        return 0;
+    }
+
+    /// <summary>Hand tracking's camera and detector alone for [seconds]: [camera] is part of a camera's name (the
+    /// first that is not the glasses' when none is given). Prints what it sees five times a second.</summary>
+    public static int HandsCamera(string? name, double seconds)
+    {
+        List<Hands.HandCameraDevice> all = Hands.HandCamera.List();
+        foreach (Hands.HandCameraDevice d in all) Console.WriteLine($"camera: {d.Name}{(d.BuiltIn ? " (built in)" : "")}{(d.Glasses ? " (glasses)" : "")}");
+        Hands.HandCameraDevice? device = name != null
+            ? all.FirstOrDefault(d => d.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
+            : Hands.HandCamera.Others(all).FirstOrDefault();
+        if (device == null)
+        {
+            Console.WriteLine("No such camera.");
+            return 1;
+        }
+        Hands.HandDetector? detector = Hands.HandDetector.Load(out string? error);
+        if (detector == null)
+        {
+            Console.WriteLine($"The hand models could not be loaded: {error}");
+            return 1;
+        }
+        (Hands.HandCamera? camera, Hands.HandCamera.Failure why) = Hands.HandCamera.Open(device, detector);
+        if (camera == null)
+        {
+            Console.WriteLine($"Could not open {device.Name}: {why}");
+            return 1;
+        }
+        double last = 0;
+        int frames = 0;
+        // One small picture of what the camera sees, beside the log, to look at afterwards (after 3 seconds, once
+        // the camera's exposure has settled).
+        new Thread(() => { Thread.Sleep(3000); camera.PreviewWanted = true; }) { IsBackground = true }.Start();
+        camera.OnPreview = (pw, ph, px) =>
+        {
+            camera.PreviewWanted = false;
+            var picture = System.Windows.Media.Imaging.BitmapSource.Create(pw, ph, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, px, pw * 4);
+            var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(picture));
+            string file = Path.Combine(Log.Shared.Folder, "hands-camera.png");
+            using (FileStream f = File.Create(file)) png.Save(f);
+            Console.WriteLine($"What the camera sees (mirrored): {file}");
+        };
+        camera.OnFrame = f =>
+        {
+            frames++;
+            if (f.TimeMs - last < 200) return;
+            last = f.TimeMs;
+            string what = f.Hands.Count == 0 ? (camera.Dark ? "dark, no hand" : "no hand")
+                : FormattableString.Invariant($"hand at {f.Hands[0].Centre.X:0.00}, {f.Hands[0].Centre.Y:0.00}, pinch {f.Hands[0].PinchRatio:0.00}, {f.Hands[0].Side?.RawValue() ?? "side unknown"}, palm to camera {HandPalm.FacesCamera(f.Hands[0])}");
+            Console.WriteLine($"{f.TimeMs / 1000:0.0} s  {what}");
+        };
+        Thread.Sleep(TimeSpan.FromSeconds(seconds));
+        camera.Stop();
+        Console.WriteLine($"{frames} frames looked at in {seconds:0} s");
+        Thread.Sleep(1000);
+        return 0;
+    }
 }

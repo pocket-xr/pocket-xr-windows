@@ -20,6 +20,30 @@ public static class Pointer
     public static void MoveTo(DisplayInfo d, double u, double v) =>
         SetCursorPos(d.X + (int)Math.Round((d.Width - 1) * Math.Clamp(u, 0, 1)), d.Y + (int)Math.Round((d.Height - 1) * Math.Clamp(v, 0, 1)));
 
+    /// <summary>Presses or lets go of the left mouse button where the pointer is (hand tracking's pinch). Windows
+    /// does not let it reach a window run as administrator.</summary>
+    public static void Button(bool down)
+    {
+        var input = new MouseInput { Type = 0, Flags = down ? 0x0002u : 0x0004u };
+        SendInput(1, new[] { input }, Marshal.SizeOf<MouseInput>());
+    }
+
+    // INPUT with its MOUSEINPUT, laid out as on 64-bit Windows (40 bytes: the union starts 8 bytes in).
+    [StructLayout(LayoutKind.Explicit, Size = 40)]
+    private struct MouseInput
+    {
+        [FieldOffset(0)] public uint Type;
+        [FieldOffset(8)] public int Dx;
+        [FieldOffset(12)] public int Dy;
+        [FieldOffset(16)] public uint MouseData;
+        [FieldOffset(20)] public uint Flags;
+        [FieldOffset(24)] public uint Time;
+        [FieldOffset(32)] public IntPtr ExtraInfo;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, MouseInput[] inputs, int size);
+
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out NativePoint p);
     [DllImport("user32.dll")]

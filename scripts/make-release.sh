@@ -16,6 +16,13 @@ rm -rf "dist/$NAME" "dist/$NAME.zip"
     -o "dist/$NAME" -nologo -v q
 
 cp LICENSE "dist/$NAME/LICENSE.txt"
+{
+    echo "Pocket XR for Windows includes:"
+    echo
+    echo "- Google's MediaPipe hand landmarker models, converted to ONNX. Copyright Google LLC, Apache License 2.0:"
+    echo "  https://www.apache.org/licenses/LICENSE-2.0"
+    echo "- ONNX Runtime. Copyright Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime"
+} > "dist/$NAME/THIRD-PARTY.txt"
 cat > "dist/$NAME/READ ME.txt" <<EOF
 Pocket XR for Windows $VERSION (preview)
 

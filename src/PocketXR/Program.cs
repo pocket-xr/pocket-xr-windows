@@ -15,6 +15,8 @@ public static class Program
     /// PocketXR --render-ui FOLDER   every window drawn to PNG files, with no glasses and no window
     /// PocketXR --usb                the USB devices and displays Windows has, and the glasses found among them
     /// PocketXR --imu-test [SECONDS] head tracking alone: yaw and pitch ten times a second
+    /// PocketXR --hands-test FILE     hand tracking's detector on a picture: the hand's points
+    /// PocketXR --hands-camera [SECONDS] [NAME]  the camera and detector alone, what they see
     /// PocketXR --driver             the virtual display driver's own details (changes nothing)
     /// PocketXR --quit               asks the running copy to quit and put the glasses back
     /// PocketXR --stand-in N         a test: monitor N (not the main one) stands in for the glasses' display
@@ -42,6 +44,9 @@ public static class Program
                     case "--capture-test":
                         return Render.RenderTools.CaptureTest(args.Length > 1 && double.TryParse(args[1], out double c) ? c : 3);
                     case "--driver": return Tools.Driver();
+                    case "--hands-test": return Tools.HandsTest(args[1]);
+                    case "--hands-camera":
+                        return Tools.HandsCamera(args.Length > 2 ? args[2] : null, args.Length > 1 && double.TryParse(args[1], out double hs) ? hs : 15);
                     case "--make-icon":
                         new System.Windows.Application();
                         return AppIcon.Make(args.Length > 1 ? args[1] : "PocketXR.ico");

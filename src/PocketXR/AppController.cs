@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using PocketXR.Core;
+using PocketXR.Hands;
 using PocketXR.Platform;
 using PocketXR.Ui;
 using PocketXR.Windows;
@@ -19,7 +20,7 @@ namespace PocketXR;
 /// Pocket XR on a PC: finds the glasses, makes the floating screens, captures them, tracks the head and draws the
 /// Space on the glasses. Lives in the notification area, with a control panel, a settings window and the tour.
 /// </summary>
-public sealed class AppController : IAppActions, IDisposable
+public sealed class AppController : IAppActions, IHandsHost, IDisposable
 {
     public readonly SettingsStore Store = new();
     public readonly AppState State = new();
@@ -35,6 +36,7 @@ public sealed class AppController : IAppActions, IDisposable
     private ControllerInput? controllerInput;
     private SpaceGrab? grab;
     private EdgeHint? edgeHint;
+    private HandTracking? hands;
     private bool panelShownBeforePocket;
     private DispatcherTimer? timer;
     private EventWaitHandle? showSignal, quitSignal;
@@ -117,6 +119,7 @@ public sealed class AppController : IAppActions, IDisposable
             trayMenu = TrayMenu.Show(Store, State, this, x, y);
         };
         RegisterShortcuts();
+        hands = new HandTracking(Store, State, this, ui);
         Store.Changed += (old, now) => ui.BeginInvoke(() => SettingsChanged(old, now));
         SystemEvents.DisplaySettingsChanged += OnDisplaysChanged;
 
@@ -340,8 +343,13 @@ public sealed class AppController : IAppActions, IDisposable
         State.LinkOpen = false;
         messages?.ShowTray(g != null ? iconLit : iconIdle, g != null ? $"Pocket XR · {g.Value.Name}" : "Pocket XR");
         Recompute();
-        if (g is not Glasses glassesNow) return;
+        if (g is not Glasses glassesNow)
+        {
+            hands?.Stop();
+            return;
+        }
         StartTracking(glassesNow);
+        if (Store.S.HandsOn) hands?.Start();
         if (glassesNow.ControlLink)
         {
             var s = new SettingsControl(glassesNow, st => ui.BeginInvoke(() => SettingsStateChanged(st)));
@@ -1061,16 +1069,57 @@ public sealed class AppController : IAppActions, IDisposable
 
     public void SetHands(bool on)
     {
-        // Hand tracking is not in the Windows version yet.
-        Log.P($"hand tracking: asked {(on ? "on" : "off")}; not in Pocket XR for Windows yet");
+        Log.P($"hand tracking: asked {(on ? "on" : "off")}");
+        if (on) hands?.Start();
+        else hands?.Stop();
+        State.Notify();
     }
 
-    // Hand tracking is not in the Windows version yet: these do nothing, and State.HandsAvailable stays false.
-    public void ChooseHandsCamera(int index) { }
-    public void BeginHandCalibration() { }
-    public void ResetHandCalibration() { }
-    public void BeginHandReach() { }
-    public void ResetHandReach() { }
+    public void ChooseHandsCamera(int index) => hands?.ChooseCamera(index);
+    public void BeginHandCalibration() => hands?.BeginCalibration();
+    public void ResetHandCalibration() => hands?.ResetCalibration();
+    public void BeginHandReach() => hands?.BeginReach();
+    public void ResetHandReach() => hands?.ResetReach();
+
+    // MARK: what hand tracking asks of the app (IHandsHost)
+
+    public bool AimPointer(double headYawDeg, double headPitchDeg)
+    {
+        // In Steady mode the glasses place the picture themselves, and the app does not know where it sits.
+        if (State.Steady || headPose is not HeadPose pose) return false;
+        Quat ray = HeadQuat(pose) * (Quat.AboutY(headYawDeg * Math.PI / 180) * Quat.AboutX(headPitchDeg * Math.PI / 180));
+        PanelPlacement[] panels;
+        lock (frameGate) panels = placements;
+        List<DisplayInfo> shown = Shown;
+        if (LookTarget.Hit(ray, panels) is not (int index, double u, double v) || index >= shown.Count) return false;
+        Pointer.MoveTo(shown[index], u, v);
+        return true;
+    }
+
+    /// <summary>The screens drawn in the glasses, in the panels' order: the floating screens, or the PC's own screen
+    /// when there are none (no virtual display driver, or a stand-in test).</summary>
+    private List<DisplayInfo> Shown => floating.Count > 0 ? floating : mirrored is DisplayInfo own ? new List<DisplayInfo> { own } : new();
+
+    public bool PlacePointer(double u, double v)
+    {
+        List<DisplayInfo> shown = Shown;
+        if (shown.Count == 0) return false;
+        int index = Math.Min(pointerScreen ?? 0, shown.Count - 1);
+        if (!State.Steady && headPose is HeadPose pose)
+        {
+            PanelPlacement[] panels;
+            lock (frameGate) panels = placements;
+            if (LookTarget.Hit(HeadQuat(pose), panels) is (int looked, _, _) && looked < shown.Count) index = looked;
+        }
+        Pointer.MoveTo(shown[index], Math.Clamp(u, 0.002, 0.998), Math.Clamp(v, 0.002, 0.998));
+        return true;
+    }
+
+    public void PointerButton(bool down) => Pointer.Button(down);
+
+    public DisplayInfo? FloatingScreen(int index) => index >= 0 && index < Shown.Count ? Shown[index] : null;
+
+    public (double Yaw, double Pitch) HeadDeg => headPose is HeadPose pose ? pose.YawPitchDeg : (0, 0);
     public void OpenCameraSettings() => Open("ms-settings:privacy-webcam");
 
     public void SendLogs() => Platform.SendLogs.Run(State.Version);
@@ -1198,6 +1247,7 @@ public sealed class AppController : IAppActions, IDisposable
         picture?.Dispose();
         picture = null;
         StopTracking();
+        hands?.Stop();
         bool done = false;
         void Finish()
         {

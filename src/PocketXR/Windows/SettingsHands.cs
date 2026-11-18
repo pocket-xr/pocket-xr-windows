@@ -12,8 +12,8 @@ namespace PocketXR.Windows;
 // Hand tracking's settings, as cards in the settings window's look: on and off with where it stands, which camera
 // (with a picture of what a camera that faces you is for), how the pointer is aimed, what the hands do (each with a
 // small drawing), the camera's permission, the aim's calibration or reach, and a plain note that none of this has
-// been tried on a PC. Hand tracking is not in the Windows version yet: the pane says so first, and the buttons that
-// would start it stay off until AppState.HandsAvailable is true.
+// been tried on a PC. The buttons that start it stay off until AppState.HandsAvailable is true (Hands/HandTracking.cs
+// sets it).
 
 /// <summary>The lines hand tracking puts in AppState.HandsStatus, word for word as on the Mac, so the pane can say
 /// what to do about each.</summary>
@@ -34,9 +34,6 @@ public static class SettingsHands
 {
     public static IEnumerable<FrameworkElement> Cards(SettingsStore store, AppState state, IAppActions actions, Binder b)
     {
-        Border notice = SettingsParts.Notice("Hand tracking is not in the Windows version yet. The settings here are kept for when it is.");
-        b.Add(() => SettingsParts.Show(!state.HandsAvailable, notice));
-        yield return notice;
         yield return TrackingCard(store, state, actions, b);
         yield return CameraCard(state, actions, b);
         yield return GesturesCard(store, state, b);
@@ -44,10 +41,10 @@ public static class SettingsHands
             new SettingsRow("Camera", "Lets Pocket XR see your hands. The picture is used on this PC only and is never kept.",
                 new PxButton("Open Windows Settings", Glyph.Camera, ButtonKind.Glass, actions.OpenCameraSettings)));
         yield return AimCard(store, state, actions, b);
-        yield return Kit.Card("Not tried on a PC yet",
-            Kit.Note("Hand tracking has not been tried on a PC yet. The hand ray needs glasses with a camera Windows can open: the XREAL Aura on firmware 16.1.03 or older. Newer Aura firmware turns the camera off.", warn: true),
+        yield return Kit.Card("What has been tried",
+            Kit.Note("The air trackpad has been tried on a PC with a Logitech C920 webcam. The hand ray has not been tried on a PC yet: it needs glasses with a camera Windows can open: the XREAL Aura on firmware 16.1.03 or older. Newer Aura firmware turns the camera off.", warn: true),
             Kit.Divider(),
-            Kit.Note("The air trackpad, with a camera that faces you, has not been tried yet either. Lighting and the camera's angle matter: have the light on your hand, not behind it, and turn the camera until your hand sits in the box."),
+            Kit.Note("Lighting and the camera's angle matter: have the light on your hand, not behind it, and turn the camera until your hand sits in the box."),
             Kit.Divider(),
             Kit.Note("The camera's light is on while hands are running."));
     }
@@ -139,8 +136,7 @@ public static class SettingsHands
         return SettingsParts.LiveCard(b, "Camera", () => string.Join("|", state.HandsCameras) + "#" + state.HandsFacing, Rows);
     }
 
-    /// <summary>What a camera that faces you is for, beside a few words on how to use it. The Windows version has no
-    /// camera picture to show yet, so the panel holds a drawn hand in the box.</summary>
+    /// <summary>What a camera that faces you sees, as in a mirror, beside a few words on how to use it.</summary>
     private static FrameworkElement PreviewRow(AppState state, Binder own)
     {
         var view = new HandsPreviewView(() => state.HandsRunning) { VerticalAlignment = VerticalAlignment.Center };
@@ -434,8 +430,8 @@ public sealed class HandsGlyph : FrameworkElement
 }
 
 /// <summary>
-/// What a camera that faces you sees, as a panel: the air trackpad's box and the tracked point on it. The Windows
-/// version has no camera picture yet, so the panel is plain and dark with a hand drawn in it.
+/// What a camera that faces you sees, as a panel: the camera's picture as in a mirror (Hands.HandsPreview), the air
+/// trackpad's box and the tracked point on it. With no picture, plain and dark with a hand drawn in it.
 /// </summary>
 public sealed class HandsPreviewView : FrameworkElement
 {
@@ -448,6 +444,13 @@ public sealed class HandsPreviewView : FrameworkElement
         Width = Wide;
         Height = High;
         AutomationProperties.SetName(this, "What the camera sees");
+        // While it shows, hand tracking sends the camera's picture about 10 times a second.
+        IsVisibleChanged += (_, _) =>
+        {
+            Hands.HandsPreview.Watching = IsVisible && !Theme.Static;
+            if (IsVisible) Hands.HandsPreview.Changed += InvalidateVisual;
+            else Hands.HandsPreview.Changed -= InvalidateVisual;
+        };
     }
 
     protected override void OnRender(DrawingContext dc)
@@ -456,8 +459,16 @@ public sealed class HandsPreviewView : FrameworkElement
         dc.PushClip(new RectangleGeometry(whole, 10, 10));
         dc.DrawRectangle(new LinearGradientBrush(Theme.C(Look.GlassBottom), Theme.C(Look.Page), 90), null, whole);
         // In a picture drawn to a file: a hand a little left of the box's middle, as if it were being tracked.
-        HandPoint? point = Theme.Static ? new HandPoint(0.47, 0.55) : null;
-        if (Theme.Static || !running())
+        System.Windows.Media.Imaging.BitmapSource? picture = Theme.Static ? null : Hands.HandsPreview.Picture;
+        HandPoint? point = Theme.Static ? new HandPoint(0.47, 0.55) : running() ? Hands.HandsPreview.Point : null;
+        if (picture != null && running())
+        {
+            // The picture fills the panel, cut to its shape.
+            double k = Math.Max(Wide / picture.PixelWidth, High / picture.PixelHeight);
+            double pw = picture.PixelWidth * k, ph = picture.PixelHeight * k;
+            dc.DrawImage(picture, new Rect((Wide - pw) / 2, (High - ph) / 2, pw, ph));
+        }
+        else if (Theme.Static || !running())
         {
             const double length = 96, k = length / HandsGlyph.Side;
             double px = (point?.X ?? 0.5) * Wide, py = (point?.Y ?? 0.5) * High;

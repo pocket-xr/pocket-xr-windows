@@ -27,6 +27,13 @@
     <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
     <PackageReference Include="Vortice.DXGI" Version="3.6.2" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.6.2" />
+    <!-- Hand tracking: runs MediaPipe's hand models (Hands/Models, Apache 2.0) on the CPU. MIT licence. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Hands\Models\hand_detector.onnx" LogicalName="PocketXR.Hands.hand_detector.onnx" />
+    <EmbeddedResource Include="Hands\Models\hand_landmarks_detector.onnx" LogicalName="PocketXR.Hands.hand_landmarks_detector.onnx" />
   </ItemGroup>
 
   <ItemGroup>

@@ -27,6 +27,9 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
   to and restored from a file, open when you sign in.
 - **Tour**: eight steps, opens the first time.
 - **Launcher** (Ctrl+Alt+Space), **Pocket mode** (Ctrl+Alt+K), a **game controller** as a remote.
+- **Hand tracking** (Ctrl+Alt+H): a webcam that faces you makes an air trackpad (move your hand, pinch to click), and
+  glasses with a camera Windows can open aim a hand ray. Palm to the camera and a short pinch opens the launcher; a held
+  pinch recentres. It runs Google's MediaPipe hand models on the PC, with ONNX Runtime; the picture never leaves the PC.
 - Every control has a key that works in any app, all with Ctrl+Alt: R recentre, S Steady mode, = and - size,
   ] and [ distance, . and , curve, L next layout, D 3D, P pointer to the screen you look at, Space the launcher,
   K Pocket mode, H hand tracking.
@@ -67,6 +70,8 @@ PocketXR --driver               is the virtual display driver there and answerin
 PocketXR --render-ui FOLDER     every window drawn to PNG files, with no glasses and no window
 PocketXR --render-space OUT.png the Space drawn off screen as the glasses would get it (add --sbs for 3D)
 PocketXR --stand-in 2           a test: monitor 2 stands in for the glasses' display
+PocketXR --hands-test FILE      the hand detector on a picture: the hand's 21 points
+PocketXR --hands-camera 15 C920 a camera and the hand detector alone for 15 s: what they see
 ```
 
 The log is at `%LOCALAPPDATA%\Pocket XR\pocket-xr.log`; **Send logs to Mike** makes a zip of it in Downloads with
@@ -86,6 +91,9 @@ glasses; and what is not written yet.
 ## Licence
 
 GPL-3.0, as Pocket XR. Pocket XR is a community project, not made by or affiliated with XREAL or VITURE.
+
+The hand models in `src/PocketXR/Hands/Models` are Google's MediaPipe hand landmarker, Apache 2.0 (see the README
+there). ONNX Runtime is Microsoft's, MIT licence.
 
 The first Windows prototype (Python, November 2026) is kept in `pocketxr/` and `tests/` for its test notes; the app is
 in `src/`.
