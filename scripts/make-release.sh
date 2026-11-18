@@ -1,12 +1,12 @@
 #!/bin/bash
 # Builds Pocket XR for Windows' download: one self-contained PocketXR.exe (no .NET to install), a short read-me and the
-# licence, zipped as dist/PocketXR-Windows-<version>-preview.zip. Runs the checks first and stops if any fails.
+# licence, zipped as dist/PocketXR-Windows-<version>.zip. Runs the checks first and stops if any fails.
 # Publishes nothing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DOTNET="${DOTNET:-$LOCALAPPDATA/PocketXR-tools/dotnet/dotnet.exe}"
 VERSION="$(tr -d '[:space:]' < VERSION)"
-NAME="PocketXR-Windows-$VERSION-preview"
+NAME="PocketXR-Windows-$VERSION"
 
 "$DOTNET" run --project src/PocketXR.Checks -c Release
 
@@ -15,6 +15,8 @@ rm -rf "dist/$NAME" "dist/$NAME.zip"
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \
     -o "dist/$NAME" -nologo -v q
 
+# ONNX Runtime's package also brings its .lib files, which only a C++ build would use.
+rm -f "dist/$NAME"/*.lib
 cp LICENSE "dist/$NAME/LICENSE.txt"
 {
     echo "Pocket XR for Windows includes:"
@@ -24,7 +26,7 @@ cp LICENSE "dist/$NAME/LICENSE.txt"
     echo "- ONNX Runtime. Copyright Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime"
 } > "dist/$NAME/THIRD-PARTY.txt"
 cat > "dist/$NAME/READ ME.txt" <<EOF
-Pocket XR for Windows $VERSION (preview)
+Pocket XR for Windows $VERSION
 
 Your PC's apps on your XR glasses, as screens floating in front of you that stay put as you turn your head.
 
@@ -36,8 +38,9 @@ Your PC's apps on your XR glasses, as screens floating in front of you that stay
 Floating screens need Parsec's free Virtual Display Driver: the control panel shows how to get it ("How to add
 floating screens"). Without it, the glasses show your PC's own screen.
 
-Tried so far only with the XREAL Aura, on a Steam Deck running Windows 11. If something is wrong, use
-"Send logs to Mike" in the menu.
+Tried so far only with the XREAL Aura, on a Steam Deck running Windows 11. Hand tracking (Ctrl+Alt+H) has been
+tried with a webcam that faces you (the air trackpad); the hand ray through glasses' cameras has not. If something is
+wrong, use "Send logs to Mike" in the menu.
 
 Free and open source (GPL-3.0, see LICENSE.txt). Not made by or affiliated with XREAL, VITURE or Parsec.
 EOF
