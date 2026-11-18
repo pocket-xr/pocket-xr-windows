@@ -757,11 +757,13 @@ public static class ControlPanel
                 holder.Children.Clear();
                 if (state.Steady)
                 {
-                    TextBlock words = Kit.Small("In Steady mode the glasses show your screens side by side on one flat picture. Change their size here. Turn Steady mode off for layouts, distance and curve.");
+                    TextBlock words = Kit.Small("In Steady mode the glasses show your screens side by side on one flat picture. Change their size and the gap between them here. Turn Steady mode off for layouts, distance and curve.");
                     words.Margin = new Thickness(16, 10, 16, 2);
                     holder.Children.Add(words);
                     holder.Children.Add(Slider(inner, "Size", () => store.S.SteadyZoom, v => store.Update(s => s.SteadyZoom = v),
                         SpaceSettings.SteadyZoomRange, 0.05, SettingsFormat.Percent));
+                    holder.Children.Add(Slider(inner, "Gap", () => store.S.SteadyGapDeg, v => store.Update(s => s.SteadyGapDeg = v),
+                        SpaceSettings.SteadyGapRange, 0.1, SettingsFormat.TenthDegrees));
                 }
                 else
                 {

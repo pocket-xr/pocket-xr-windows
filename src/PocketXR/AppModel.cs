@@ -312,6 +312,7 @@ public static class SettingsFormat
     }
     /// <summary>"Off" at 0, else a percentage.</summary>
     public static string Glow(double v) => v <= 0.0001 ? "Off" : Percent(v);
+    public static string TenthDegrees(double v) => v.ToString("0.0", Inv) + "°";
     public static string SignedDegrees(double v) => v.ToString("+0.0;-0.0", Inv) + "°";
     public static string Percent(double v) => Math.Round(v * 100).ToString("0", Inv) + " %";
     public static string Millimetres(double v) => Math.Round(v).ToString("0", Inv) + " mm";

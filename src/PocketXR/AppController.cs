@@ -348,6 +348,10 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             hands?.Stop();
             return;
         }
+        // Steady mode comes back on with glasses that can do it, if it was on when the user last chose (or Pocket XR
+        // restarted itself in it). Until then the glasses stay in 2D.
+        resumeStarted = false;
+        resumingSteady = glassesNow.SteadyCapable && (resumeSteady || Store.S.SteadyOn);
         StartTracking(glassesNow);
         if (Store.S.HandsOn) hands?.Start();
         if (glassesNow.ControlLink)
@@ -377,13 +381,16 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             ResetSteadyScroll();
             Recompute();
         }
-        // Steady mode was on when Pocket XR started itself again: back on, once the glasses have settled. Until then
-        // the glasses are left in 2D (Want3D says no): a switch to 3D and straight on to Steady mode was too much for
-        // the Aura on the Mac (16 Nov 2026: it answered 5001 three times, then dropped off USB).
-        if (st.Link && !st.Busy && !st.Steady && resumeSteady && !resumeStarted)
+        // Already on (the glasses kept it): nothing to bring back.
+        if (st.Steady) resumingSteady = false;
+        // Steady mode was on last time (or when Pocket XR started itself again): back on, once the glasses have
+        // settled. Until then the glasses are left in 2D (Want3D says no): a switch to 3D and straight on to Steady mode
+        // was too much for the Aura on the Mac (16 Nov 2026: it answered 5001 three times, then dropped off USB).
+        if (st.Link && !st.Busy && !st.Steady && resumingSteady && !resumeStarted)
         {
             resumeStarted = true;
-            Log.P("Steady mode: coming back on after the restart, once the glasses have settled");
+            Log.P(resumeSteady ? "Steady mode: coming back on after the restart, once the glasses have settled"
+                : "Steady mode: it was on last time, so it comes back on once the glasses have settled");
             var later = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
             later.Tick += (_, _) =>
             {
@@ -621,7 +628,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             fov = 12;
             double hfov = 2 * Math.Atan(Math.Tan(fov * Math.PI / 360) * wholeAspect) * 180 / Math.PI;
             double n = Math.Max(aspects.Count, 1);
-            const double gap = 0.6;
+            double gap = s.SteadyGapDeg;
             // Bigger and smaller in Steady mode: the row drawn larger or smaller on the glasses' picture.
             double each = Math.Max(2, (hfov * 0.96 - gap * (n - 1)) / n * s.SteadyZoom);
             placed = SpaceLayout.Row(aspects, each, SpaceLayout.DefaultDistance, gap);
@@ -952,6 +959,10 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     {
         if (settings == null || !State.SteadyAvailable) return;
         Log.P($"Steady mode: asked {(on ? "on" : "off")}");
+        // Remembered for the next time the glasses connect or Pocket XR starts.
+        if (Store.S.SteadyOn != on) Store.Update(s => s.SteadyOn = on);
+        // The user has chosen: nothing is waiting to come back on, and 3D may be asked for again.
+        resumingSteady = false;
         modeAskedAt = Now;
         settings.SetSteady(on);
     }

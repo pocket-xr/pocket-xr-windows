@@ -76,12 +76,12 @@ public static class TourCopy
     public const string GlassesUnplugged = "Not plugged in yet. Plug them into a USB-C port that carries video. The tour works without them.";
     public static string GlassesConnected(string name) => $"Connected: {name}.";
 
-    /// <summary>What is known for these glasses on a PC. Nothing is called tested: only the Aura's head tracking and
-    /// USB link have been used with Pocket XR for Windows.</summary>
+    /// <summary>What is known for these glasses on a PC: the Aura, used by Mike on a Steam Deck running Windows, and
+    /// the XREAL 1S, used by a tester on Windows 11 (18 Nov 2026, Reddit).</summary>
     public static string Support(TourSupport support, string name) => support switch
     {
         TourSupport.Tested => "Tried on a Steam Deck running Windows: floating screens, 3D and head tracking.",
-        TourSupport.SameTrackingUntested => $"{name}: uses the same head tracking as the Aura. Not tried on a PC yet.",
+        TourSupport.SameTrackingUntested => $"{name}: uses the same head tracking as the Aura. A tester uses the XREAL 1S on Windows 11; the rest of the One series is not tried on a PC yet.",
         TourSupport.ExperimentalTracking => $"{name}: not tried on a PC yet. Head tracking is an experimental switch in Settings.",
         _ => $"{name}: not tried on a PC yet. No head tracking.",
     };
@@ -141,7 +141,7 @@ public static class TourCopy
     public const string Steady = "Steady mode";
     public static string SteadyLine() =>
         $"For reading and working: the glasses hold the picture completely still themselves. {Keys("steady")} turns it on and off.";
-    public const string SteadyNote = "For the XREAL Aura and the One series. Not tried on a PC yet.";
+    public const string SteadyNote = "For the XREAL Aura and the One series. A tester uses it on Windows 11 with the XREAL 1S.";
 
     // 7. Always in the notification area
     public const string MenuBody = "The control panel on your PC's screen has everything in one place. Close it and the glasses icon in the notification area (the icons by the clock) opens it again. Its menu holds Recentre, Settings, this tour and Send logs.";

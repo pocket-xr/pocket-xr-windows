@@ -57,7 +57,8 @@ public static class Pictures
         var aspects = Enumerable.Repeat(16.0 / 9, screens).ToList();
         if (steady)
         {
-            const double fov = 12, gap = 0.6;
+            const double fov = 12;
+            double gap = s.SteadyGapDeg;
             double hfov = 2 * Math.Atan(Math.Tan(fov * Math.PI / 360) * (32.0 / 9)) * 180 / Math.PI;
             double each = Math.Max(2, (hfov * 0.96 - gap * (screens - 1)) / screens * s.SteadyZoom);
             return SpaceLayout.Row(aspects, each, SpaceLayout.DefaultDistance, gap).ToList();

@@ -24,5 +24,14 @@ public static class SettingsChecks
 
         SpaceSettings? back = SpaceSettings.TryDecode(new SpaceSettings().Encode());
         Check.That(back == new SpaceSettings(), "a round trip keeps every value");
+
+        // Steady mode's screen gap and whether Steady mode was on: defaults, ranges and a round trip.
+        Check.That(s?.SteadyGapDeg == 0.6 && s?.SteadyOn == false, "steady gap and steady on default for an older file");
+        var steady = new SpaceSettings { SteadyGapDeg = 1.7, SteadyOn = true };
+        SpaceSettings? steadyBack = SpaceSettings.TryDecode(steady.Encode());
+        Check.That(steadyBack?.SteadyGapDeg == 1.7 && steadyBack?.SteadyOn == true, "steady gap and steady on kept in a round trip");
+        Check.That(new SpaceSettings { SteadyGapDeg = -2 }.Clamped.SteadyGapDeg == 0, "steady gap held at 0 or more");
+        Check.That(new SpaceSettings { SteadyGapDeg = 9 }.Clamped.SteadyGapDeg == 3, "steady gap held at 3 degrees or less");
+        Check.That(steady != new SpaceSettings(), "steady gap and steady on count in equality");
     }
 }

@@ -342,6 +342,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     /// further away; larger runs off the sides (Head scroll slides it).
     /// </summary>
     public double SteadyZoom = 1.0;
+    /// <summary>Steady mode: the gap between screens in the row, degrees.</summary>
+    public double SteadyGapDeg = 0.6;
 
     // The picture
     /// <summary>3D side by side: each eye its own picture.</summary>
@@ -372,6 +374,9 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     // Steady mode
     /// <summary>Steady mode uses the glasses' Spatial Anchor (6DoF) where they have it.</summary>
     public bool SteadySixDof = true;
+    /// <summary>Steady mode was on when the user last turned it on or off: it comes back on when the glasses connect.
+    /// Unplugging and quitting leave it as it is.</summary>
+    public bool SteadyOn = false;
     /// <summary>Head tracking over USB HID for the XREAL Air family and VITURE (untested on a Mac).</summary>
     public bool HidTracking = false;
 
@@ -409,6 +414,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     public static readonly (double LowerBound, double UpperBound) OffsetYawRange = (-90.0, 90.0);
     public const int MaxPinnedApps = 10;
     public static readonly (double LowerBound, double UpperBound) SteadyZoomRange = (0.4, 1.6);
+    public static readonly (double LowerBound, double UpperBound) SteadyGapRange = (0.0, 3.0);
     public static readonly (double LowerBound, double UpperBound) OffsetPitchRange = (-40.0, 40.0);
 
     /// <summary>A copy that shares nothing with this one (what assigning a Swift struct gives).</summary>
@@ -441,6 +447,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             s.ScreenYawDeg = s.ScreenYawDeg.Take(ScreensRange.UpperBound).Select(v => Held(v, OffsetYawRange)).ToList();
             s.ScreenPitchDeg = s.ScreenPitchDeg.Take(ScreensRange.UpperBound).Select(v => Held(v, OffsetPitchRange)).ToList();
             s.SteadyZoom = Held(s.SteadyZoom, SteadyZoomRange);
+            s.SteadyGapDeg = Held(s.SteadyGapDeg, SteadyGapRange);
             if (s.PinnedApps.Count > MaxPinnedApps) s.PinnedApps = s.PinnedApps.Take(MaxPinnedApps).ToList();
             return s;
         }
@@ -536,6 +543,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         ScreenYawDeg = other.ScreenYawDeg;
         ScreenPitchDeg = other.ScreenPitchDeg;
         SteadyZoom = other.SteadyZoom;
+        SteadyGapDeg = other.SteadyGapDeg;
         Want3D = other.Want3D;
         IpdMm = other.IpdMm;
         Glow = other.Glow;
@@ -551,6 +559,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         HeadScroll = other.HeadScroll;
         PointerFollowsHead = other.PointerFollowsHead;
         SteadySixDof = other.SteadySixDof;
+        SteadyOn = other.SteadyOn;
         HidTracking = other.HidTracking;
         Shortcuts = other.Shortcuts;
         LaunchAtLogin = other.LaunchAtLogin;
@@ -571,13 +580,13 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             && Distance == other.Distance && Curve == other.Curve && SharperText == other.SharperText
             && Presets.SequenceEqual(other.Presets) && OffsetYawDeg == other.OffsetYawDeg
             && OffsetPitchDeg == other.OffsetPitchDeg && SpaceSettingsJson.SameList(ScreenYawDeg, other.ScreenYawDeg)
-            && SpaceSettingsJson.SameList(ScreenPitchDeg, other.ScreenPitchDeg) && SteadyZoom == other.SteadyZoom
+            && SpaceSettingsJson.SameList(ScreenPitchDeg, other.ScreenPitchDeg) && SteadyZoom == other.SteadyZoom && SteadyGapDeg == other.SteadyGapDeg
             && Want3D == other.Want3D && IpdMm == other.IpdMm && Glow == other.Glow && GlowColor == other.GlowColor
             && EdgeFade == other.EdgeFade && Brightness == other.Brightness && HeadTracking == other.HeadTracking
             && TrackingMode == other.TrackingMode && RecentreFollowsTilt == other.RecentreFollowsTilt
             && DrawSmoothing == other.DrawSmoothing && StillLock == other.StillLock
             && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll
-            && PointerFollowsHead == other.PointerFollowsHead && SteadySixDof == other.SteadySixDof
+            && PointerFollowsHead == other.PointerFollowsHead && SteadySixDof == other.SteadySixDof && SteadyOn == other.SteadyOn
             && HidTracking == other.HidTracking && Shortcuts == other.Shortcuts && LaunchAtLogin == other.LaunchAtLogin
             && TourSeen == other.TourSeen && PanelAtStart == other.PanelAtStart
             && PinnedApps.SequenceEqual(other.PinnedApps) && PinsChosen == other.PinsChosen
@@ -629,6 +638,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("screenYawDeg", x => SpaceSettingsJson.WriteDoubles(x, ScreenYawDeg)),
             ("screenPitchDeg", x => SpaceSettingsJson.WriteDoubles(x, ScreenPitchDeg)),
             ("steadyZoom", x => x.WriteNumberValue(SteadyZoom)),
+            ("steadyGapDeg", x => x.WriteNumberValue(SteadyGapDeg)),
             ("want3D", x => x.WriteBooleanValue(Want3D)),
             ("ipdMm", x => x.WriteNumberValue(IpdMm)),
             ("glow", x => x.WriteNumberValue(Glow)),
@@ -644,6 +654,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("headScroll", x => x.WriteBooleanValue(HeadScroll)),
             ("pointerFollowsHead", x => x.WriteBooleanValue(PointerFollowsHead)),
             ("steadySixDof", x => x.WriteBooleanValue(SteadySixDof)),
+            ("steadyOn", x => x.WriteBooleanValue(SteadyOn)),
             ("hidTracking", x => x.WriteBooleanValue(HidTracking)),
             ("shortcuts", x => x.WriteBooleanValue(Shortcuts)),
             ("launchAtLogin", x => x.WriteBooleanValue(LaunchAtLogin)),
@@ -714,6 +725,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         if (SpaceSettingsJson.Has(c, "headScroll", out v)) s.HeadScroll = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "pointerFollowsHead", out v)) s.PointerFollowsHead = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadySixDof", out v)) s.SteadySixDof = SpaceSettingsJson.Bool(v);
+        if (SpaceSettingsJson.Has(c, "steadyOn", out v)) s.SteadyOn = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "hidTracking", out v)) s.HidTracking = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "shortcuts", out v)) s.Shortcuts = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "launchAtLogin", out v)) s.LaunchAtLogin = SpaceSettingsJson.Bool(v);
@@ -738,6 +750,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             s.HandAim = HandAimExt.FromRawValue(SpaceSettingsJson.String(v)) ?? throw new JsonException("handAim");
         }
         if (SpaceSettingsJson.Has(c, "steadyZoom", out v)) s.SteadyZoom = SpaceSettingsJson.Double(v);
+        if (SpaceSettingsJson.Has(c, "steadyGapDeg", out v)) s.SteadyGapDeg = SpaceSettingsJson.Double(v);
         if (SpaceSettingsJson.Has(c, "screenYawDeg", out v)) s.ScreenYawDeg = SpaceSettingsJson.Doubles(v);
         if (SpaceSettingsJson.Has(c, "screenPitchDeg", out v)) s.ScreenPitchDeg = SpaceSettingsJson.Doubles(v);
         return s;

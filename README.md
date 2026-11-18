@@ -6,8 +6,9 @@ It is the Windows version of [Pocket XR](https://github.com/pocket-xr/pocket-xr)
 desktop for Android phones, and a sibling of Pocket XR for Steam Deck and Pocket XR for Mac. Same glasses, same
 rules, no account and no paid tier.
 
-> **Preview.** Seen working on 17 November 2026 on a Steam Deck running Windows 11 with the XREAL Aura: floating
-> screens in the glasses, held still by head tracking, in 3D. No other glasses, and no other PC, have been tried yet.
+> **What has been tried.** Seen working on 17 November 2026 on a Steam Deck running Windows 11 with the XREAL Aura: floating
+> screens in the glasses, held still by head tracking, in 3D. On 18 November 2026 a tester reported the XREAL 1S working on
+> Windows 11 for hours, in normal and Steady mode. Other glasses have not been tried yet.
 > See "Where it stands" below.
 
 ## How it is meant to work
@@ -21,7 +22,8 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 
 - **Control panel**: what is plugged in, a map of the displays (click a screen to send the pointer there), a pad to
   drag the screens about and scroll to resize them, saved arrangements, the layout (side by side, main + side,
-  stacked, theater), size, distance and curve, 3D and Steady mode.
+  stacked, theater), size, distance and curve, 3D and Steady mode (with its size and the gap between screens).
+  Steady mode is remembered: if it was on, it comes back on when the glasses connect.
 - **Settings**: a live picture of your Space, eye distance, brightness, the glow around the screen you look at, edge
   fade, tracking (Body Anchor or Smooth Follow), head scroll, the tracking readings, a Glasses report, settings saved
   to and restored from a file, open when you sign in.
