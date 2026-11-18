@@ -174,7 +174,7 @@ public sealed class HidImuReader
         }
         // VITURE: the Beast's motion sensor is interface 5; other models are tried interface by interface.
         return found
-            .OrderByDescending(c => c.Product == Glasses.VitureBeast && c.Interface == VitureImuProtocol.BeastImuInterface)
+            .OrderByDescending(c => Glasses.IsBeastProduct(c.Product) && c.Interface == VitureImuProtocol.BeastImuInterface)
             .ThenBy(c => c.Interface ?? 1000).ToList();
     }
 

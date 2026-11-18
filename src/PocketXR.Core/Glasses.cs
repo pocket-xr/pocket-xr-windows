@@ -80,6 +80,12 @@ public record struct Glasses
         [0x043D] = "XREAL 1S", [0x043E] = "XREAL 1S", [0x0443] = "XREAL One Pro+", [0x0444] = "XREAL One Pro+",
     };
     public const int VitureBeast = 0x1211;
+    /// <summary>A second Beast USB id, reported by a tester (November 2026) with the same layout: HID on interface 5.</summary>
+    public const int VitureBeast1201 = 0x1201;
+    /// <summary>The VITURE Beast's USB product ids.</summary>
+    public static readonly IReadOnlySet<int> BeastProducts = new HashSet<int> { VitureBeast, VitureBeast1201 };
+
+    public static bool IsBeastProduct(int product) => BeastProducts.Contains(product);
     public const int VitureMicrophone = 0x1102;
     public static readonly IReadOnlyDictionary<int, string> AirImu = new Dictionary<int, string>
     {
@@ -115,7 +121,7 @@ public record struct Glasses
     /// <summary>Glasses whose menu settings Pocket XR reads and puts right on every link: the Aura only.</summary>
     public readonly bool Managed => Family == GlassesFamily.Aura;
 
-    public readonly bool IsBeast => Family == GlassesFamily.Viture && Product == VitureBeast;
+    public readonly bool IsBeast => Family == GlassesFamily.Viture && IsBeastProduct(Product);
 
     /// <summary>The One family and the VITURE Beast send x right, y down, z front; the Aura x right, y up, z back.</summary>
     public readonly HeadFusion.Axes Axes => Family == GlassesFamily.One || IsBeast ? HeadFusion.Axes.One : HeadFusion.Axes.Aura;
@@ -175,7 +181,7 @@ public record struct Glasses
             return new Glasses(name: airName, family: GlassesFamily.Air, vendor: air.Vendor, product: air.Product);
         }
         List<UsbDeviceInfo> vit = devices.Where(d => d.Vendor == Viture && d.Product != VitureMicrophone).ToList();
-        if ((First(vit, d => d.Product == VitureBeast) ?? First(vit, _ => true)) is UsbDeviceInfo viture)
+        if ((First(vit, d => IsBeastProduct(d.Product)) ?? First(vit, _ => true)) is UsbDeviceInfo viture)
         {
             return new Glasses(
                 name: viture.Name.Length == 0 ? "VITURE glasses" : viture.Name, family: GlassesFamily.Viture,
