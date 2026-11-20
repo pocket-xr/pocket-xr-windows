@@ -363,7 +363,7 @@ internal sealed class HostServer : IDisposable
                 $"{(outs > 0 ? (e.OutBytes - lastOutBytes) / outs / 1024 : 0)} KB each, submit-to-output {(outs > 0 ? (e.EncodeMsSum - lastMs) / outs : 0):F1} ms (max {e.EncodeMsMax:F1})");
             lastNeeds = e.NeedInputs; lastOuts = e.Outputs; lastKeys = e.Keys; lastOutBytes = e.OutBytes; lastMs = e.EncodeMsSum; e.EncodeMsMax = 0;
             Log.P($"host: {(f - lastFrames) / 10.0:F1} frames/s sent, {(b - lastBytes) * 8 / 10.0 / 1e6:F1} Mbps, " +
-                $"{e.Captured} pictures captured, {HostInput.Sent} input events, {e.pointerShapes} pointer shapes, {s.Audio?.PacketsSent ?? 0} sound packets, " +
+                $"{e.Captured} pictures captured, {HostInput.Sent} input events, {e.pointerShapes} pointer shapes, {s.Audio?.PacketsSent ?? 0} sound packets ({s.Audio?.SilentPackets ?? 0} silent, {s.Audio?.Trimmed ?? 0} trimmed in all), " +
                 $"control {(s.Control?.Connected == true ? "connected" : "not connected")}" +
                 (e.Error.Length > 0 ? $", encoder: {e.Error}" : ""));
             lastFrames = f;
@@ -462,6 +462,40 @@ internal sealed class HostServer : IDisposable
 
     /// <summary>PocketXR --host-clipboard-test N: the clipboard read and written back N times from worker threads, as
     /// the host's web requests do (its text is left as it was).</summary>
+    public static int AudioTest(string[] args)
+    {
+        // PocketXR --host-audio-test [SECONDS] [PORT]: the host's sound alone, sent to this PC, and the gaps between packets.
+        double seconds = args.Length > 1 && double.TryParse(args[1], out double s) ? s : 5;
+        int port = args.Length > 2 && int.TryParse(args[2], out int p) ? p : 51200;
+        using var audio = new HostAudio(port, 5, true, new byte[16], 0);
+        using var sock = new System.Net.Sockets.UdpClient(0);
+        sock.Send(new byte[] { 1, 2, 3, 4 }, 4, new IPEndPoint(IPAddress.Loopback, port));
+        Thread.Sleep(200);
+        audio.Start();
+        sock.Client.ReceiveTimeout = 1000;
+        var gaps = new List<double>();
+        long last = 0, start = Stopwatch.GetTimestamp();
+        int sound = 0, parity = 0;
+        while ((Stopwatch.GetTimestamp() - start) < seconds * Stopwatch.Frequency)
+        {
+            IPEndPoint from = new(IPAddress.Any, 0);
+            byte[] b;
+            try { b = sock.Receive(ref from); } catch (System.Net.Sockets.SocketException) { break; }
+            if (b.Length < 2) continue;
+            if (b[1] == 127) { parity++; continue; }
+            sound++;
+            long now = Stopwatch.GetTimestamp();
+            if (last != 0) gaps.Add((now - last) * 1000.0 / Stopwatch.Frequency);
+            last = now;
+        }
+        gaps.Sort();
+        double P(double q) => gaps.Count == 0 ? 0 : gaps[Math.Min(gaps.Count - 1, (int)(q * gaps.Count))];
+        int bursts = gaps.Count(g => g < 1.0);
+        Console.WriteLine($"sound packets {sound} ({sound / seconds:F0}/s), parity {parity}, silent {audio.SilentPackets}, trimmed {audio.Trimmed}");
+        Console.WriteLine($"gap ms: p1 {P(0.01):F2}, p50 {P(0.5):F2}, p99 {P(0.99):F2}, max {(gaps.Count > 0 ? gaps[^1] : 0):F2}; under 1 ms: {bursts}");
+        return 0;
+    }
+
     public static int ClipboardTest(string[] args)
     {
         int n = args.Length > 1 && int.TryParse(args[1], out int k) ? k : 100;

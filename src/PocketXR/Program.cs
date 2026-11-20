@@ -56,6 +56,7 @@ public static class Program
                     case "--host": return PcHost.HostServer.RunCommand(args);
                     case "--host-encoder-test": return PcHost.HostServer.EncoderTest(args);
                     case "--host-clipboard-test": return PcHost.HostServer.ClipboardTest(args);
+                    case "--host-audio-test": return PcHost.HostServer.AudioTest(args);
                     case "--host-pin": return PcHost.HostServer.GivePin(args);
                     case "--host-stop": return PcHost.HostServer.StopCommand();
                     case "--pc-screen-tls": return PcScreens.PcScreenSession.TlsReport(args);

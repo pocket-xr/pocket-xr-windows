@@ -18,6 +18,12 @@ namespace PocketXR.PcHost;
 /// duration (5 ms), each sent as RTP payload type 97, AES-CBC encrypted when the client asks (key: the launch's key;
 /// IV: the big-endian launch key id plus the sequence number). After every four packets, two Reed-Solomon parity
 /// packets (payload type 127) with GameStream's own parity matrix, so a lost packet is rebuilt.
+///
+/// Pacing, as Sunshine does it: captured sound goes into a ring, and a thread of its own sends one packet every packet
+/// duration, by the clock, from the ring; silence only when the ring is empty. Sending each capture straight away sent
+/// NAudio's ~50 ms chunks as ten packets back to back, and nothing at all while the PC was silent: the phone dropped
+/// "too much pending audio" about 27 times a second and its player underran (Mike's glasses, 20 Nov 2026). The ring is
+/// held to a few packets, so the capture's clock running a little fast against this one never builds up delay.
 /// </summary>
 internal sealed unsafe class HostAudio : IDisposable
 {
@@ -29,7 +35,12 @@ internal sealed unsafe class HostAudio : IDisposable
     private readonly uint keyId;
     private readonly IOpusEncoder opus;
     private readonly Aes? aes;
-    private WasapiLoopbackCapture? capture;
+    private WasapiCapture? capture;
+    /// <summary>Captured 48 kHz stereo samples, interleaved, waiting to be sent; [ringCount] of them from [ringStart].</summary>
+    private readonly float[] ring;
+    private int ringStart, ringCount;
+    private readonly object ringGate = new();
+    public long SilentPackets, Trimmed;
     private volatile IPEndPoint? client;
     private readonly Thread pings;
     private volatile bool stopping;
@@ -62,6 +73,7 @@ internal sealed unsafe class HostAudio : IDisposable
         opus.UseVBR = false;
         opus.Complexity = 5;
         pending = new float[frameSamples * Channels * 4];
+        ring = new float[Rate * Channels / 2]; // half a second at most
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Bind(new IPEndPoint(IPAddress.Any, port));
         socket.IOControl(unchecked((int)0x9800000C), new byte[] { 0 }, null);
@@ -73,12 +85,15 @@ internal sealed unsafe class HostAudio : IDisposable
     {
         try
         {
-            capture = new WasapiLoopbackCapture();
+            // A 20 ms buffer, so the capture is read every ~10 ms (NAudio's own loopback capture uses 100 ms).
+            var device = new MMDeviceEnumerator().GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            capture = new Loopback(device, 20);
             var f = capture.WaveFormat;
             Log.P($"host: sound from {f.SampleRate} Hz, {f.Channels} channels, {f.BitsPerSample} bits ({f.Encoding}); " +
                 $"Opus {Bitrate / 1000} kbps in {durationMs} ms packets, {(encrypt ? "encrypted" : "not encrypted")}");
             capture.DataAvailable += (_, e) => Captured(e.Buffer, e.BytesRecorded, f);
             capture.StartRecording();
+            new Thread(Pace) { IsBackground = true, Name = "Host-audio-pace", Priority = ThreadPriority.AboveNormal }.Start();
         }
         catch (Exception e)
         {
@@ -142,9 +157,91 @@ internal sealed unsafe class HostAudio : IDisposable
         pending[pendingCount++] = r;
         if (pendingCount >= frameSamples * Channels)
         {
-            SendFrame(pending.AsSpan(0, frameSamples * Channels));
+            Store(pending.AsSpan(0, frameSamples * Channels));
             pendingCount = 0;
         }
+    }
+
+    /// <summary>A packet's worth of samples into the ring. More than 8 packets waiting: the oldest go, down to 2.</summary>
+    private void Store(ReadOnlySpan<float> pcm)
+    {
+        lock (ringGate)
+        {
+            int packet = frameSamples * Channels;
+            if (ringCount + pcm.Length > 8 * packet)
+            {
+                int drop = ringCount + pcm.Length - 2 * packet;
+                drop = Math.Min(drop, ringCount);
+                ringStart = (ringStart + drop) % ring.Length;
+                ringCount -= drop;
+                Trimmed += drop / packet;
+            }
+            for (int i = 0; i < pcm.Length; i++) ring[(ringStart + ringCount + i) % ring.Length] = pcm[i];
+            ringCount += pcm.Length;
+        }
+    }
+
+    /// <summary>One packet every packet duration, by the clock: from the ring, or silence when it is empty.</summary>
+    private void Pace()
+    {
+        timeBeginPeriod(1);
+        try
+        {
+            int packet = frameSamples * Channels;
+            var frame = new float[packet];
+            long tick = System.Diagnostics.Stopwatch.Frequency * durationMs / 1000;
+            long next = System.Diagnostics.Stopwatch.GetTimestamp();
+            bool primed = false;
+            while (!stopping)
+            {
+                long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                if (now < next)
+                {
+                    double ms = (next - now) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                    if (ms > 1.5) Thread.Sleep(1);
+                    else Thread.SpinWait(50);
+                    continue;
+                }
+                // Far behind (the PC was busy): start again from now rather than send a burst.
+                if (now - next > 10 * tick) next = now;
+                next += tick;
+                if (client == null) continue;
+                bool fromRing;
+                lock (ringGate)
+                {
+                    // After silence, wait for two packets in hand before playing from the ring, so one late capture
+                    // does not cut in with silence.
+                    if (!primed && ringCount >= 2 * packet) primed = true;
+                    fromRing = primed && ringCount >= packet;
+                    if (fromRing)
+                    {
+                        for (int i = 0; i < packet; i++) frame[i] = ring[(ringStart + i) % ring.Length];
+                        ringStart = (ringStart + packet) % ring.Length;
+                        ringCount -= packet;
+                    }
+                    else primed = false;
+                }
+                if (!fromRing)
+                {
+                    Array.Clear(frame);
+                    SilentPackets++;
+                }
+                SendFrame(frame);
+            }
+        }
+        catch (Exception e) { Log.P($"host: sound pacing stopped: {e.Message}"); }
+        finally { timeEndPeriod(1); }
+    }
+
+    [System.Runtime.InteropServices.DllImport("winmm.dll")] private static extern uint timeBeginPeriod(uint ms);
+    [System.Runtime.InteropServices.DllImport("winmm.dll")] private static extern uint timeEndPeriod(uint ms);
+
+    /// <summary>NAudio's loopback capture with a buffer of our choosing (its own is 100 ms).</summary>
+    private sealed class Loopback : WasapiCapture
+    {
+        public Loopback(MMDevice device, int bufferMs) : base(device, false, bufferMs) { }
+        protected override NAudio.CoreAudioApi.AudioClientStreamFlags GetAudioClientStreamFlags() =>
+            NAudio.CoreAudioApi.AudioClientStreamFlags.Loopback | base.GetAudioClientStreamFlags();
     }
 
     private void SendFrame(ReadOnlySpan<float> pcm)
