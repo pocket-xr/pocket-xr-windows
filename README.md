@@ -56,6 +56,14 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
   also be installed with `winget install --id Parsec.ParsecVDD -e`. SudoVDA (the driver the Apollo streaming app
   installs) works too. Without a driver, the glasses show the PC's own screen. Pocket XR itself never asks for
   administrator rights, and is not made by or affiliated with Parsec.
+- For **Let my phone stream this PC**: a graphics card that encodes video (AV1, HEVC or H.264). Tried on AMD
+  graphics only; NVIDIA and Intel are untested. With SudoVDA on the PC, each stream gets a display of the phone's
+  window shape; without it, the main display is streamed, scaled. Windows asks once whether Pocket XR may use the
+  network: allow it on private networks.
+- PC screens and the host use Moonlight's stream core, `native/moonlight` (moonlight-common-c, GPL-3.0), built into
+  `moonlight-pxr.dll` with Zig's C compiler by `native/moonlight/build.ps1`.
+
+What is new in each version: [docs/release-notes-0.4.0.md](docs/release-notes-0.4.0.md) and the notes beside it.
 
 ## Build
 
