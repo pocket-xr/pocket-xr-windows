@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace PocketXR.Core;
 
@@ -93,6 +95,75 @@ public static class AirImuProtocol
 
     /// <summary>The command that starts (or with [on] false, stops) the IMU stream.</summary>
     public static byte[] StreamCommand(bool on = true) => Command(CmdImuStream, new[] { on ? (byte)1 : (byte)0 });
+
+    // MARK: the XBX's MCU
+
+    // With Pocket XR for Steam Deck 0.6.0, a tester's XBX A01+ (Pierre Zammit, November 2026) sent nothing at all on
+    // interface 1 after the stream command. wheaney's nrealAirLinuxDriver (hid_ids.c and mcu_hid.c, MIT) marks the XBX
+    // A01 and A01+ as needing an MCU "heartbeat" on interface 0 before the IMU streams: commands 0x26, 0x57, 0x12 (1),
+    // 0x02 (1), 0x34, 0x35, then 0x31 with the SDK version "3.1.1", then 0x1A with the time every 100 ms. The MCU has
+    // frames of its own (0xFD), not the IMU's 0xAA ones. Ported from Pocket XR for Steam Deck 0.6.1. Untested.
+
+    public static bool IsXbx(int product) => product is XbxA01 or XbxA01Plus;
+    public const int McuInterface = 0;
+    public const byte McuHead = 0xFD;
+    public const int McuHeartbeatId = 0x1A;
+    public static readonly byte[] McuSdkVersion = "3.1.1"u8.ToArray();
+    /// <summary>The MCU's start-up handshake, in order: (message id, data).</summary>
+    public static readonly IReadOnlyList<(int Id, byte[] Data)> McuBootstrap = new (int, byte[])[]
+    {
+        (0x26, Array.Empty<byte>()), (0x57, Array.Empty<byte>()), (0x12, new byte[] { 1, 0, 0, 0 }),
+        (0x02, new byte[] { 1, 0, 0, 0 }), (0x34, Array.Empty<byte>()), (0x35, Array.Empty<byte>()), (0x31, McuSdkVersion),
+    };
+
+    /// <summary>
+    /// An XREAL MCU frame: 0xFD, the CRC32 (little endian) of everything after it, then a little endian length (17 +
+    /// data), timestamp (u64), message id (u16), 5 reserved bytes, the data. Not padded here.
+    /// </summary>
+    public static byte[] McuCommand(int id, byte[]? data = null, ulong timestamp = 0)
+    {
+        data ??= Array.Empty<byte>();
+        int length = 17 + data.Length;
+        var f = new byte[5 + length];
+        f[0] = McuHead;
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(f.AsSpan(5), (ushort)length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(f.AsSpan(7), timestamp);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(f.AsSpan(15), (ushort)id);
+        data.CopyTo(f, 22);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(1), Crc32(f, from: 5));
+        return f;
+    }
+
+    /// <summary>The heartbeat: 0x1A with the time (ns, any steady clock).</summary>
+    public static byte[] McuHeartbeat(ulong nowNs)
+    {
+        var t = new byte[8];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(t, nowNs);
+        return McuCommand(McuHeartbeatId, t);
+    }
+
+    /// <summary>
+    /// The XBX's tries, in order, as (interface, with the MCU heartbeat): interface 1 alone, then interface 1 with the
+    /// MCU woken on 0, then any other interface the glasses have (2 on the A01+), still with the heartbeat. Other Air
+    /// models: their IMU interface only, never another one.
+    /// </summary>
+    public static List<(int Interface, bool Heartbeat)> Tries(int product, IEnumerable<int> interfaces)
+    {
+        var have = interfaces.Distinct().OrderBy(i => i).ToList();
+        int imu = ImuInterface(product);
+        var tries = new List<(int, bool)>();
+        if (have.Contains(imu)) tries.Add((imu, false));
+        if (!IsXbx(product)) return tries;
+        bool mcu = have.Contains(McuInterface);
+        if (mcu && have.Contains(imu)) tries.Add((imu, true));
+        foreach (int i in have)
+            if (i != McuInterface && i != imu) tries.Add((i, mcu));
+        return tries;
+    }
+
+    /// <summary>The first bytes of a report in hex, for the log: "01 02 1a ... (64 bytes)".</summary>
+    public static string HexStart(byte[] data, int n = 16) =>
+        string.Join(" ", data.Take(n).Select(b => b.ToString("x2"))) + (data.Length > n ? " ..." : "") + $" ({data.Length} bytes)";
 
     /// <summary>Whether [packet] is a sensor report (not a command's answer, which starts 0xAA).</summary>
     public static bool IsReport(byte[] packet) => packet.Length >= 0x2A && packet[0] == 0x01 && packet[1] == 0x02;

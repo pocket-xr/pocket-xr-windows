@@ -78,6 +78,29 @@ public static class GlassesChecks
         Check.That(AirImuProtocol.IsAir(vendor: 0x3318, product: 0x0440) && AirImuProtocol.IsAir(vendor: 0x3318, product: 0x0442),
                    "the XBX A01 and A01+ stream as an Air");
         Check.That(AirImuProtocol.ModelName(0x0442) == "XREAL XBX A01+" && AirImuProtocol.ModelName(0x0440) == "XREAL XBX A01", "their names");
+
+        // The XBX's MCU frame, as wheaney's library lays it out (the Deck's test, the same bytes).
+        byte[] mcu = AirImuProtocol.McuCommand(0x31, AirImuProtocol.McuSdkVersion);
+        Check.That(mcu[0] == 0xFD && mcu.Length == 5 + 17 + 5, "an MCU frame: 0xFD, CRC, 17 bytes of head, the data");
+        Check.That((mcu[5] | mcu[6] << 8) == 22 && mcu[7..15].All(b => b == 0) && (mcu[15] | mcu[16] << 8) == 0x31,
+                   "its length (17 + data), timestamp 0, message id 0x31");
+        Check.That(mcu[17..22].All(b => b == 0) && mcu[22..].SequenceEqual("3.1.1"u8.ToArray()), "5 reserved bytes, then the SDK version");
+        uint mcuCrc = (uint)(mcu[1] | mcu[2] << 8 | mcu[3] << 16 | mcu[4] << 24);
+        Check.That(mcuCrc == AirImuProtocol.Crc32(mcu, from: 5), "its CRC32 covers everything after the CRC");
+        byte[] beat = AirImuProtocol.McuHeartbeat(123);
+        Check.That(beat.Length == 30 && beat[15] == 0x1A && beat[16] == 0 && beat[22] == 123, "the heartbeat: 0x1A with the time");
+        Check.That(AirImuProtocol.McuBootstrap.Select(m => m.Id).SequenceEqual(new[] { 0x26, 0x57, 0x12, 0x02, 0x34, 0x35, 0x31 }),
+                   "the MCU's start-up handshake, in the library's order");
+        Check.That(AirImuProtocol.HexStart(Enumerable.Range(0, 20).Select(i => (byte)i).ToArray(), 4) == "00 01 02 03 ... (20 bytes)",
+                   "the first bytes of a report, in hex");
+
+        // The XBX A01+'s tries: interface 1 alone, with the MCU woken on 0, then interface 2. An Air 2 tries only its own.
+        var xbxTries = AirImuProtocol.Tries(0x0442, new[] { 0, 1, 2 });
+        Check.That(xbxTries.SequenceEqual(new[] { (1, false), (1, true), (2, true) }), "the XBX: 1, then 1 with the heartbeat, then 2");
+        Check.That(AirImuProtocol.Tries(0x0440, new[] { 1 }).SequenceEqual(new[] { (1, false) }), "with no interface 0 listed, no heartbeat");
+        Check.That(AirImuProtocol.Tries(0x0428, new[] { 0, 1, 2, 3, 4 }).SequenceEqual(new[] { (3, false) }), "the Air 2: interface 3 only");
+        Check.That(AirImuProtocol.Tries(0x0426, new[] { 0, 1, 2, 3 }).SequenceEqual(new[] { (2, false) }), "the Air 2 Ultra: interface 2 only");
+        Check.That(AirImuProtocol.Tries(0x0428, new[] { 4 }).Count == 0, "no IMU interface listed: nothing tried");
         Check.That(!AirImuProtocol.IsAir(vendor: 0x3318, product: 0x0439), "the Aura is not an Air");
         Check.That(!AirImuProtocol.IsAir(vendor: 0x3318, product: 0x0437), "the One is not an Air");
         Check.That(!AirImuProtocol.IsAir(vendor: 0x1234, product: 0x0432), "another maker's device is not an Air");
