@@ -19,7 +19,8 @@
 - **Smooth sound** when your phone streams this PC: the sound is now sent at an even pace (one packet every 5 ms), as
   Sunshine does. Before, it arrived in bursts and sounded choppy.
 - **XREAL XBX A01 and A01+**: head tracking over USB on their HID interface 1. Turn it on in Settings, Experimental.
-  Untested: if you have one, **Send logs to Mike** in the menu helps a lot.
+  Untested: if you have one, **Send logs to Mike** in the menu helps a lot. Thanks to Pierre Zammit for his XBX A01+
+  logs, which led to this.
 
 Not tried yet: pairing a phone that was not paired before (the "Allow" question and the PIN box), starting PC VR
 through the app instead of the old helper, the Apollo setup from the menu, waking a sleeping PC from the phone (the PC
