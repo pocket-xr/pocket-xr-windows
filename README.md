@@ -32,6 +32,14 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - **Hand tracking** (Ctrl+Alt+H): a webcam that faces you makes an air trackpad (move your hand, pinch to click), and
   glasses with a camera Windows can open aim a hand ray. Palm to the camera and a short pinch opens the launcher; a held
   pinch recentres. It runs Google's MediaPipe hand models on the PC, with ONNX Runtime; the picture never leaves the PC.
+- **Another computer in these glasses** (the menu and the control panel): another computer's desktop as one
+  of the floating screens, streamed with Moonlight's protocol from Apollo, Sunshine or Pocket XR for Windows on that
+  computer. For glasses plugged into this PC. Glasses on your phone open PC screens from Pocket XR on the phone. With
+  no glasses plugged into this PC it says so instead of opening anything, and this PC never streams itself.
+- **Let my phone stream this PC** (the control panel and the menu): this PC's screens on your phone's glasses, with no
+  Apollo needed. It also does what the separate Pocket XR PC helper did (finding this PC, pairing with no typing,
+  starting SteamVR for PC VR, Apollo's PINs), so that helper is no longer needed: on first start Pocket XR stops it,
+  takes it out of Windows' start list, and keeps the phones it had paired.
 - Every control has a key that works in any app, all with Ctrl+Alt: R recentre, S Steady mode, = and - size,
   ] and [ distance, . and , curve, L next layout, D 3D, P pointer to the screen you look at, Space the launcher,
   K Pocket mode, H hand tracking.

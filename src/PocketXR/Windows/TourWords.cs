@@ -122,6 +122,7 @@ public static class TourWords
                     unplug.SetLit(p == 2);
                 });
                 Add(Kit.Down(8, open, quit, unplug), 3, 14);
+                if (PcScreens.PcScreenLauncher.Available) Add(Kit.Small(TourCopy.MenuOtherComputers), 4, 14);
                 break;
             }
 

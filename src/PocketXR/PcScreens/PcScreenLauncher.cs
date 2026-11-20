@@ -17,6 +17,13 @@ public static class PcScreenLauncher
 {
     private static readonly Process?[] running = new Process?[PcScreenLogic.Count];
 
+    // The words for it, the same in the menu, the control panel, the tour and the README. Mike tried it with his glasses
+    // on his phone and it opened a window on the monitor streaming this PC to itself (20 Nov 2026).
+    public const string Title = "Another computer in these glasses";
+    public const string Note = "For glasses plugged into this PC. Glasses on your phone open PC screens from Pocket XR on the phone.";
+    public const string NoGlasses = "No glasses are plugged into this PC, so there is nowhere to show another computer. " +
+        "Plug your glasses into this PC first. Glasses on your phone open PC screens from Pocket XR on the phone.";
+
     /// <summary>Whether Moonlight's core is beside the app (a build without native/moonlight has none).</summary>
     public static bool Available => File.Exists(Path.Combine(AppContext.BaseDirectory, "moonlight-pxr.dll"));
 

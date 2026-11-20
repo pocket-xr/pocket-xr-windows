@@ -232,6 +232,19 @@ internal sealed class HostWeb
         return "";
     }
 
+    /// <summary>The MAC address of the card that has [address], as aa:bb:cc:dd:ee:ff; zeros if none has it.</summary>
+    internal static string MacFor(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        foreach (var nic in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (!nic.GetIPProperties().UnicastAddresses.Any(u => u.Address.Equals(address))) continue;
+            byte[] b = nic.GetPhysicalAddress().GetAddressBytes();
+            if (b.Length == 6) return string.Join(":", b.Select(x => x.ToString("x2")));
+        }
+        return "00:00:00:00:00:00";
+    }
+
     private string ServerInfo(bool paired, IPEndPoint local)
     {
         var sb = new StringBuilder();
@@ -242,7 +255,9 @@ internal sealed class HostWeb
         sb.Append(E("HttpsPort", host.HttpsPort));
         sb.Append(E("ExternalPort", host.HttpPort));
         sb.Append(E("MaxLumaPixelsHEVC", host.HasHevc ? "1869449984" : "0"));
-        sb.Append(E("mac", "00:00:00:00:00:00"));
+        // The network card's address, for Wake-on-LAN (the phone wakes a sleeping PC, or asks its wake relay at home to):
+        // to a paired phone only, as Apollo gives it.
+        sb.Append(E("mac", paired ? MacFor(local.Address) : "00:00:00:00:00:00"));
         // Launch, the mouse and the keyboard: what the phone checks before it streams.
         // Apollo's bits as the PC helper gives a phone: input, clipboard both ways, launch, view (0x07031F00).
         sb.Append(E("Permission", paired ? 0x07031F00 | 0x4001800 : 0));

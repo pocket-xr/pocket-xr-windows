@@ -38,6 +38,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Hands\Models\hand_detector.onnx" LogicalName="PocketXR.Hands.hand_detector.onnx" />
+    <EmbeddedResource Include="PcHost\PocketXR-PC-Screens.ps1" LogicalName="PocketXR.PcScreens.ps1" />
     <EmbeddedResource Include="Hands\Models\hand_landmarks_detector.onnx" LogicalName="PocketXR.Hands.hand_landmarks_detector.onnx" />
   </ItemGroup>
 

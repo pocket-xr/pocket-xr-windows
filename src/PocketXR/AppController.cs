@@ -38,6 +38,12 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     private EdgeHint? edgeHint;
     private HandTracking? hands;
     private bool panelShownBeforePocket;
+    // "Let my phone stream this PC": this PC's own host, the phone link (the PC helper's jobs) and the sound keeper.
+    private PcHost.HostServer? phoneHost;
+    private PcHost.PhoneLink? phoneLink;
+    private PcHost.SoundKeeper? soundKeeper;
+    private bool phoneStarting;
+    private PxWindow? pinWindow;
     private DispatcherTimer? timer;
     private EventWaitHandle? showSignal, quitSignal;
 
@@ -160,6 +166,15 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         controllerInput = new ControllerInput(Store, State, this);
         controllerInput.Start();
         grab = new SpaceGrab(() => Store.S.GrabKeys && floating.Count > 0 && !quitting, NudgeSpace);
+        // Someone who used the PC helper as its own program: the app takes its jobs over, once, with the switch on.
+        if (!Store.S.PhoneHelperMovedOver && PcHost.OldHelper.Present)
+        {
+            // It started with Windows: so does the app now, or phones would lose this PC after a restart.
+            bool atSignIn = PcHost.OldHelper.StartsWithWindows;
+            Log.P($"old PC helper found: Pocket XR takes its jobs over (Let my phone stream this PC: on{(atSignIn ? "; starts with Windows in its place" : "")})");
+            Store.Update(s => { s.PhoneStreamsPc = true; s.PhoneHelperMovedOver = true; if (atSignIn) s.LaunchAtLogin = true; });
+        }
+        if (Store.S.PhoneStreamsPc) StartPhone();
         if (Tour.OpensByItself(Store.S.TourSeen))
         {
             var later = new DispatcherTimer { Interval = TimeSpan.FromSeconds(0.6) };
@@ -538,6 +553,11 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         }
         if (old.Shortcuts != now.Shortcuts) RegisterShortcuts();
         if (old.LaunchAtLogin != now.LaunchAtLogin) SignIn.Set(now.LaunchAtLogin);
+        if (old.PhoneStreamsPc != now.PhoneStreamsPc)
+        {
+            if (now.PhoneStreamsPc) StartPhone();
+            else StopPhone();
+        }
         if (old.HidTracking != now.HidTracking && glasses is Glasses g && !g.NetworkImu)
         {
             Log.P($"head tracking over USB HID: {(now.HidTracking ? "on" : "off")}");
@@ -1235,12 +1255,123 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
 
     public void OpenPcScreen()
     {
+        // Only for glasses plugged into this PC: without them it opened a window on the monitor (Mike's glasses were on
+        // his phone, 20 Nov 2026).
+        if (State.GlassesName == null && standIn == null)
+        {
+            Log.P("pc screens: no glasses on this PC: said so instead of opening one");
+            PhonePrompts.Tell(ui, PcScreens.PcScreenLauncher.Title, PcScreens.PcScreenLauncher.NoGlasses);
+            return;
+        }
         if (!PcScreens.PcScreenLauncher.Available)
         {
             Log.P("pc screens: Moonlight's core (moonlight-pxr.dll) is not beside the app");
             return;
         }
         PcScreens.PcScreenLauncher.OpenNext(floating);
+    }
+
+    public void SetPhoneStreams(bool on)
+    {
+        Log.P($"let my phone stream this PC: {(on ? "on" : "off")}");
+        Store.Update(s => s.PhoneStreamsPc = on);
+    }
+
+    public void ForgetPhones()
+    {
+        PcHost.PhoneTokens.Forget();
+        var clients = phoneHost?.Clients ?? new PcHost.HostClients();
+        foreach (var c in clients.All()) clients.Remove(c.UniqueId);
+        Log.P("phones forgotten: each asks again, and pairs again with this PC");
+    }
+
+    public void SetUpApollo() => PcHost.ApolloSetup.Run();
+
+    /// <summary>
+    /// This PC's own host (no Apollo needed), the phone link on port 47610 (what the PC helper did: finding this PC,
+    /// pairing with no typing, PC VR, Apollo's PINs) and the sound keeper, started off the app's thread. A PC helper
+    /// still running as its own program is stopped first: it holds the same port.
+    /// </summary>
+    private void StartPhone()
+    {
+        if (phoneStarting || phoneLink != null || quitting) return;
+        phoneStarting = true;
+        State.PhoneStatus = "Starting…";
+        State.Notify();
+        new Thread(() =>
+        {
+            string? moved = PcHost.OldHelper.MoveOver();
+            if (moved != null) Log.P($"old PC helper: {moved}; Pocket XR does its jobs now");
+            PcHost.HostServer? h = null;
+            try
+            {
+                h = new PcHost.HostServer(PcHost.HostServer.DefaultBasePort, null);
+                var host = h;
+                host.PinAsked += () => ui.BeginInvoke(() => PinSoon(host));
+                host.Start();
+            }
+            catch (Exception e)
+            {
+                Log.P($"host: could not start: {e.Message}");
+                try { h?.Dispose(); } catch (Exception) { }
+                h = null;
+            }
+            var link = new PcHost.PhoneLink((title, text) => PhonePrompts.Ask(ui, title, text), h);
+            link.Start();
+            var sound = new PcHost.SoundKeeper();
+            ui.BeginInvoke(() =>
+            {
+                phoneStarting = false;
+                if (quitting || !Store.S.PhoneStreamsPc)
+                {
+                    Stopping(h, link, sound);
+                    return;
+                }
+                phoneHost = h;
+                phoneLink = link;
+                soundKeeper = sound;
+                State.PhoneStatus = h != null
+                    ? $"On. Your phone finds this PC as {h.Name}."
+                    : "On, but this PC's own host could not start (the log says why). PC VR and Apollo still work.";
+                State.Notify();
+            });
+        }) { IsBackground = true, Name = "Phone start" }.Start();
+    }
+
+    private void StopPhone()
+    {
+        var (h, link, sound) = (phoneHost, phoneLink, soundKeeper);
+        phoneHost = null;
+        phoneLink = null;
+        soundKeeper = null;
+        pinWindow?.Close();
+        State.PhoneStatus = null;
+        State.Notify();
+        new Thread(() => Stopping(h, link, sound)) { IsBackground = true, Name = "Phone stop" }.Start();
+    }
+
+    private static void Stopping(PcHost.HostServer? h, PcHost.PhoneLink? link, PcHost.SoundKeeper? sound)
+    {
+        try { link?.Dispose(); } catch (Exception e) { Log.P($"phone link: stop: {e.Message}"); }
+        try { sound?.Dispose(); } catch (Exception) { }
+        try { h?.Dispose(); } catch (Exception e) { Log.P($"host: stop: {e.Message}"); }
+    }
+
+    /// <summary>A phone waits at the PIN step: the PIN box, unless the phone link brings the PIN within 3 s.</summary>
+    private void PinSoon(PcHost.HostServer host)
+    {
+        var later = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        later.Tick += (_, _) =>
+        {
+            later.Stop();
+            if (!host.PinWanted || pinWindow != null || quitting) return;
+            Log.P("host: a phone waits for its PIN: showing the PIN box");
+            pinWindow = PhonePrompts.PinWindow(pin => host.SubmitPin(pin, null), () => host.PinWanted);
+            pinWindow.Closed += (_, _) => pinWindow = null;
+            pinWindow.Show();
+            pinWindow.Activate();
+        };
+        later.Start();
     }
 
     public void Quit()
@@ -1307,6 +1438,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         messages?.Dispose();
         showSignal?.Dispose();
         quitSignal?.Dispose();
+        Stopping(phoneHost, phoneLink, soundKeeper);
     }
 
     // MARK: shortcuts

@@ -102,7 +102,16 @@ public static class TrayMenu
         Do("Launcher", actions.ToggleLauncher, Hint("launcher"), () => state.LauncherOpen, () => state.VirtualScreens > 0);
         Do("Pocket mode", () => actions.SetPocketMode(!state.PocketMode), Hint("pocket"), () => state.PocketMode, () => state.VirtualScreens > 0);
         Do("Hand tracking", () => actions.SetHands(!state.HandsRunning), Hint("hands"), () => state.HandsRunning);
-        Do("Open a PC screen", actions.OpenPcScreen, "", null, () => PcScreens.PcScreenLauncher.Available);
+        if (PcScreens.PcScreenLauncher.Available)
+        {
+            Do(PcScreens.PcScreenLauncher.Title, actions.OpenPcScreen);
+            TextBlock pcNote = Kit.Small(PcScreens.PcScreenLauncher.Note);
+            pcNote.Margin = new Thickness(26, 0, 10, 6);
+            Add(pcNote);
+        }
+        Do("Let my phone stream this PC", () => actions.SetPhoneStreams(!store.S.PhoneStreamsPc), "", () => store.S.PhoneStreamsPc);
+        Do("Forget phones", actions.ForgetPhones, "", null, () => store.S.PhoneStreamsPc);
+        Do("Set up Apollo for PC screens…", actions.SetUpApollo);
         Rule();
         Do("Recentre", actions.Recentre, Hint("recentre"));
         Do("Steady mode", () => actions.SetSteady(!state.Steady), Hint("steady"), () => state.Steady, () => state.SteadyAvailable && state.LinkOpen);

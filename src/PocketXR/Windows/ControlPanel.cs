@@ -69,7 +69,8 @@ public static class ControlPanel
         column.Children.Add(Theme.Arrive(Spaced(MapCard(store, state, actions, binder)), 1));
         column.Children.Add(Theme.Arrive(Spaced(PlaceCard(store, state, actions, binder)), 2));
         column.Children.Add(Theme.Arrive(Spaced(SpaceCard(store, state, actions, binder)), 3));
-        column.Children.Add(Theme.Arrive(Spaced(Footer(actions)), 4));
+        column.Children.Add(Theme.Arrive(Spaced(PhoneCard(store, state, actions, binder)), 4));
+        column.Children.Add(Theme.Arrive(Spaced(Footer(actions)), 5));
         return column;
     }
 
@@ -947,6 +948,29 @@ public static class ControlPanel
         }
 
         protected override void Restyle() => Background = Hover ? Theme.GlassHover : Brushes.Transparent;
+    }
+
+    // MARK: phone
+
+    /// <summary>"Let my phone stream this PC": this PC's own host and the phone link, with one line on where it stands.</summary>
+    private static FrameworkElement PhoneCard(SettingsStore store, AppState state, IAppActions actions, Binder binder)
+    {
+        UIElement? other = null;
+        if (PcScreens.PcScreenLauncher.Available)
+        {
+            var show = new PxButton(PcScreens.PcScreenLauncher.Title, null, ButtonKind.Glass, actions.OpenPcScreen) { HorizontalAlignment = HorizontalAlignment.Left };
+            TextBlock note = Kit.Small(PcScreens.PcScreenLauncher.Note);
+            note.Margin = new Thickness(0, 8, 0, 0);
+            other = new StackPanel { Margin = new Thickness(Theme.Inset, 12, Theme.Inset, 14), Children = { show, note } };
+        }
+        var row = new Grid { Height = 44 };
+        row.Children.Add(Switch(binder, "Let my phone stream this PC", () => store.S.PhoneStreamsPc, actions.SetPhoneStreams, () => true));
+        TextBlock words = Kit.Small("");
+        words.Margin = new Thickness(Theme.Inset, 0, Theme.Inset, 12);
+        binder.Add(() => words.Text = state.PhoneStatus ?? (store.S.PhoneStreamsPc ? "Starting…"
+            : "Off. When it is on, Pocket XR on your phone shows this PC's screen in your glasses, pairs with no typing and can start SteamVR."));
+        return other == null ? Kit.Card("Phone and other computers", row, words)
+            : Kit.Card("Phone and other computers", row, words, Kit.Divider(), other);
     }
 
     // MARK: footer

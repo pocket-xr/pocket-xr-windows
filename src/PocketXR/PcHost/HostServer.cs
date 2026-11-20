@@ -112,6 +112,9 @@ internal sealed class HostServer : IDisposable
     public volatile bool PinWanted;
     /// <summary>The name the PC helper gave with the PIN (the phone's own), for the paired list.</summary>
     public volatile string? PinName;
+    /// <summary>A phone has reached the PIN step (raised on the pairing request's thread). The app shows its PIN box
+    /// if the phone's PIN does not come by itself through the phone link.</summary>
+    public event Action? PinAsked;
 
     /// <summary>The PIN, from the Pocket XR PC helper on this PC (it types it as into Apollo's web page).</summary>
     public bool SubmitPin(string pin, string? name)
@@ -128,6 +131,7 @@ internal sealed class HostServer : IDisposable
         givenPin = null;
         PinName = null;
         PinWanted = true;
+        try { PinAsked?.Invoke(); } catch (Exception e) { Log.P($"host: PIN box: {e.Message}"); }
         try { return WaitForPinInner(wait); }
         finally { PinWanted = false; }
     }
@@ -135,7 +139,7 @@ internal sealed class HostServer : IDisposable
     private string? WaitForPinInner(TimeSpan wait)
     {
         try { File.Delete(PinFile); } catch (IOException) { }
-        Log.P($"host: a phone wants to pair: give its PIN with PocketXR.exe --host-pin NNNN within {wait.TotalSeconds:F0} s");
+        Log.P($"host: a phone wants to pair: waiting {wait.TotalSeconds:F0} s for its PIN (the phone link, the app's PIN box, or PocketXR.exe --host-pin NNNN)");
         var end = DateTime.UtcNow + wait;
         while (DateTime.UtcNow < end)
         {

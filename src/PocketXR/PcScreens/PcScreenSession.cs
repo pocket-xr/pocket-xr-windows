@@ -188,6 +188,14 @@ internal sealed class PcScreenSession : Moonlight.IListener
             try
             {
                 if (closing || !wantStream) return;
+                // This PC never streams itself (a computer saved before this rule, or typed by hand).
+                if (store.D.Address.Length > 0 && PcScreenLogic.ParseAddress(store.D.Address) is { } saved && ThisPc.Is(saved.Host))
+                {
+                    Log.P($"pc screen {slot + 1}: {store.D.Address} is this PC: forgotten, looking for another computer");
+                    store.D.Address = "";
+                    store.D.PcName = null;
+                    store.Unpair();
+                }
                 if (store.D.Address.Length == 0 && !Find()) return;
                 if (!store.Paired && !Pair()) return;
                 Stream(fresh: lostAt == 0);
@@ -204,12 +212,13 @@ internal sealed class PcScreenSession : Moonlight.IListener
     /// first instance no other PC screen uses, PC screen 1 the main one.</summary>
     private bool Find()
     {
-        window.Say("Looking for computers with Apollo or Sunshine…");
+        window.Say("Looking for other computers…");
         var taken = new HashSet<string>();
         for (int other = 0; other < PcScreenLogic.Count; other++)
             if (other != slot) taken.Add(new PcScreenStore(other).D.Address);
         foreach (var pc in PcHelperLink.FindAll())
         {
+            if (ThisPc.Is(pc.Address.ToString())) continue; // never this PC itself
             var ports = pc.SunshinePorts.Count > 0 ? pc.SunshinePorts : new List<int> { 47989, 48989, 49989 };
             var answering = ports.Where(p => ServerName(pc.Address.ToString(), p) != null).ToList();
             int? port = PcScreenLogic.InstanceFor(slot, answering, p => !taken.Contains(PcScreenLogic.Typed(pc.Address.ToString(), p)));
@@ -222,8 +231,8 @@ internal sealed class PcScreenSession : Moonlight.IListener
                 return true;
             }
         }
-        window.Say("No computer found. Install Apollo (Windows) or Sunshine, and the Pocket XR PC helper, on the computer to stream from, " +
-            "or start this PC screen with --host and the computer's address.");
+        window.Say("No other computer found. On the computer to show, turn on Let my phone stream this PC in Pocket XR for Windows, " +
+            "or install Apollo or Sunshine with the Pocket XR PC helper.");
         return false;
     }
 

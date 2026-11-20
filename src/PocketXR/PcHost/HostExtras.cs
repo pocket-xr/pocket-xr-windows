@@ -43,13 +43,13 @@ internal static class HostClipboard
         finally { CloseClipboard(); }
     }
 
-    /// <summary>Another program may hold the clipboard for a moment: a few tries.</summary>
+    /// <summary>Another program may hold the clipboard for a moment: tries for a second (in the app, 200 ms once fell short, 20 Nov 2026).</summary>
     private static bool Open()
     {
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 25; i++)
         {
             if (OpenClipboard(IntPtr.Zero)) return true;
-            Thread.Sleep(20);
+            Thread.Sleep(40);
         }
         return false;
     }
