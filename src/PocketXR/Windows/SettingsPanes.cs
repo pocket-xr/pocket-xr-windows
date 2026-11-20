@@ -410,7 +410,7 @@ public static class SettingsPanes
         yield return Kit.Card("Floating screens", driver, help);
 
         yield return Kit.Card("Experimental",
-            SettingsParts.ToggleRow(b, "Head tracking for XREAL Air and VITURE (USB HID)", "Untested on a PC.",
+            SettingsParts.ToggleRow(b, "Head tracking for XREAL Air, XBX A01 and VITURE (USB HID)", "Untested on a PC.",
                 () => store.S.HidTracking, v => store.Update(s => s.HidTracking = v)));
 
         // Which glasses do what on a PC, said exactly: only the Aura has been used on one, and only its head tracking.

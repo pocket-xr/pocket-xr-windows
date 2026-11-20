@@ -147,6 +147,7 @@ public static class TourCopy
     public const string MenuBody = "The control panel on your PC's screen has everything in one place. Close it and the glasses icon in the notification area (the icons by the clock) opens it again. Its menu holds Recentre, Settings, this tour and Send logs.";
     public const string MenuOpen = "Right-click the glasses icon to open the menu. If you cannot see the icon, click the small arrow beside the clock's icons.";
     public const string MenuQuit = "\"Quit and put the glasses back\" returns your glasses to normal.";
+    public const string MenuOtherComputers = "\"" + PcScreens.PcScreenLauncher.Title + "\": another computer's desktop as one of your screens. " + PcScreens.PcScreenLauncher.Note;
     public const string MenuUnplug = "Unplug the glasses and the floating screens go away by themselves. Your windows come back to your PC's screen.";
 
     // 8. You're set

@@ -401,6 +401,10 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     /// Holding the grab keys (Control and Option on a Mac), moving the mouse moves the Space and scrolling resizes it.
     /// </summary>
     public bool GrabKeys = true;
+    /// <summary>"Let my phone stream this PC" (Windows): this PC's own host, and the phone link the PC helper was.</summary>
+    public bool PhoneStreamsPc = false;
+    /// <summary>The PC helper as its own program has been moved over to the app once (Windows).</summary>
+    public bool PhoneHelperMovedOver = false;
 
     public SpaceSettings() { }
 
@@ -571,6 +575,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         HandsOn = other.HandsOn;
         HandAim = other.HandAim;
         GrabKeys = other.GrabKeys;
+        PhoneStreamsPc = other.PhoneStreamsPc;
+        PhoneHelperMovedOver = other.PhoneHelperMovedOver;
     }
 
     public bool Equals(SpaceSettings? other)
@@ -591,7 +597,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             && TourSeen == other.TourSeen && PanelAtStart == other.PanelAtStart
             && PinnedApps.SequenceEqual(other.PinnedApps) && PinsChosen == other.PinsChosen
             && ControllerMode == other.ControllerMode && HandsOn == other.HandsOn && HandAim == other.HandAim
-            && GrabKeys == other.GrabKeys;
+            && GrabKeys == other.GrabKeys && PhoneStreamsPc == other.PhoneStreamsPc
+            && PhoneHelperMovedOver == other.PhoneHelperMovedOver;
     }
 
     public override bool Equals(object? obj) => obj is SpaceSettings s && Equals(s);
@@ -671,6 +678,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("handsOn", x => x.WriteBooleanValue(HandsOn)),
             ("handAim", x => x.WriteStringValue(HandAim.RawValue())),
             ("grabKeys", x => x.WriteBooleanValue(GrabKeys)),
+            ("phoneStreamsPc", x => x.WriteBooleanValue(PhoneStreamsPc)),
+            ("phoneHelperMovedOver", x => x.WriteBooleanValue(PhoneHelperMovedOver)),
         };
         SpaceSettingsJson.WriteObject(w, entries, sorted);
     }
@@ -734,6 +743,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         if (SpaceSettingsJson.Has(c, "offsetPitchDeg", out v)) s.OffsetPitchDeg = SpaceSettingsJson.Double(v);
         if (SpaceSettingsJson.Has(c, "panelAtStart", out v)) s.PanelAtStart = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "grabKeys", out v)) s.GrabKeys = SpaceSettingsJson.Bool(v);
+        if (SpaceSettingsJson.Has(c, "phoneStreamsPc", out v)) s.PhoneStreamsPc = SpaceSettingsJson.Bool(v);
+        if (SpaceSettingsJson.Has(c, "phoneHelperMovedOver", out v)) s.PhoneHelperMovedOver = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "pinnedApps", out v))
         {
             if (v.ValueKind != JsonValueKind.Array) throw new JsonException("pinnedApps is not a list");

@@ -139,7 +139,7 @@ public sealed class VirtualDisplays : IDisposable
     /// Adds [count] displays of [width] by [height] at [refreshHz]. Null (with the reason in [why]) when the driver
     /// is not there or refuses; whatever was added before a refusal is removed again.
     /// </summary>
-    public static VirtualDisplays? Make(int count, int width, int height, int refreshHz, out string why)
+    public static VirtualDisplays? Make(int count, int width, int height, int refreshHz, out string why, int idOffset = 0)
     {
         SafeFileHandle? h = Open(Interface, false, out why);
         if (h == null)
@@ -155,14 +155,15 @@ public sealed class VirtualDisplays : IDisposable
         for (int i = 0; i < count; i++)
         {
             // The same id each run for the same screen, so Windows remembers where the person put it.
-            var id = new Guid(0x504B5852, 0x5343, 0x524E, 0x80, 0, 0, 0, 0, 0, 0, (byte)(i + 1));
+            // idOffset: the host's screens (PcHost) take ids of their own, apart from the floating screens'.
+            var id = new Guid(0x504B5852, 0x5343, 0x524E, 0x80, 0, 0, 0, 0, 0, 0, (byte)(i + 1 + idOffset));
             var input = new byte[56];
             BitConverter.TryWriteBytes(input.AsSpan(0, 4), (uint)width);
             BitConverter.TryWriteBytes(input.AsSpan(4, 4), (uint)height);
             BitConverter.TryWriteBytes(input.AsSpan(8, 4), (uint)refreshHz);
             id.TryWriteBytes(input.AsSpan(12, 16));
-            Encoding.ASCII.GetBytes($"Pocket XR {i + 1}").CopyTo(input.AsSpan(28, 13));
-            Encoding.ASCII.GetBytes($"PXR{i + 1:D4}").CopyTo(input.AsSpan(42, 13));
+            Encoding.ASCII.GetBytes(idOffset == 0 ? $"Pocket XR {i + 1}" : $"PXR host {i + 1}").CopyTo(input.AsSpan(28, 13));
+            Encoding.ASCII.GetBytes($"PXR{i + 1 + idOffset:D4}").CopyTo(input.AsSpan(42, 13));
             var output = new byte[12];
             if (!Io(h, IoctlAdd, input, output, out _))
             {

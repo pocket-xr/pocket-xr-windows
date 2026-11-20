@@ -74,6 +74,10 @@ public static class GlassesChecks
         Check.That(AirImuProtocol.ModelName(0x0432) == "XREAL Air 2 Pro", "its name");
         Check.That(AirImuProtocol.ImuInterface(0x0432) == 3 && AirImuProtocol.ImuInterface(0x0424) == 3, "the IMU is on interface 3");
         Check.That(AirImuProtocol.ImuInterface(0x0426) == 2, "and on 2 on the Air 2 Ultra");
+        Check.That(AirImuProtocol.ImuInterface(0x0440) == 1 && AirImuProtocol.ImuInterface(0x0442) == 1, "and on 1 on the XBX A01 and A01+");
+        Check.That(AirImuProtocol.IsAir(vendor: 0x3318, product: 0x0440) && AirImuProtocol.IsAir(vendor: 0x3318, product: 0x0442),
+                   "the XBX A01 and A01+ stream as an Air");
+        Check.That(AirImuProtocol.ModelName(0x0442) == "XREAL XBX A01+" && AirImuProtocol.ModelName(0x0440) == "XREAL XBX A01", "their names");
         Check.That(!AirImuProtocol.IsAir(vendor: 0x3318, product: 0x0439), "the Aura is not an Air");
         Check.That(!AirImuProtocol.IsAir(vendor: 0x3318, product: 0x0437), "the One is not an Air");
         Check.That(!AirImuProtocol.IsAir(vendor: 0x1234, product: 0x0432), "another maker's device is not an Air");
@@ -315,6 +319,12 @@ public static class GlassesChecks
         Check.That(aura?.Family == GlassesFamily.Aura, "the Aura is found");
         Check.That(aura?.SteadyCapable == true && aura?.SixDofCapable == true && aura?.AppAnchor == true, "the Aura: Steady mode, 6DoF, its anchor set by the app");
         Check.That(aura?.HidImu == false && aura?.TrackingOnMac == true && aura?.Managed == true, "the Aura tracks over the network and is managed");
+
+        // The XBX A01+ (a tester's, USB 3318:0442: three HID interfaces) is Air family, tracked over USB HID.
+        Glasses? xbx = Found(0x0442, classes: new[] { 0x03, 0x03, 0x03 });
+        Check.That(xbx?.Family == GlassesFamily.Air && xbx?.Name == "XREAL XBX A01+", "the XBX A01+ is found as Air family");
+        Check.That(xbx?.HidImu == true && xbx?.NetworkImu == false && xbx?.SteadyCapable == false, "it tracks over USB HID, with no Steady mode");
+        Check.That(Found(0x0440)?.HidImu == true, "and so does the XBX A01");
 
         foreach (int product in new[] { 0x0435, 0x0437, 0x043D, 0x0443 })
         {

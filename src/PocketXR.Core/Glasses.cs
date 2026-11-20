@@ -90,6 +90,8 @@ public record struct Glasses
     public static readonly IReadOnlyDictionary<int, string> AirImu = new Dictionary<int, string>
     {
         [0x0424] = "XREAL Air", [0x0428] = "XREAL Air 2", [0x0432] = "XREAL Air 2 Pro", [0x0426] = "XREAL Air 2 Ultra",
+        // Untested: the stream as nrealAirLinuxDriver's hid_ids.c (MIT) gives it, on HID interface 1 (20 Nov 2026).
+        [0x0440] = "XREAL XBX A01", [0x0442] = "XREAL XBX A01+",
     };
     public static readonly IReadOnlySet<int> AirFamily = new HashSet<int>
     {
@@ -153,8 +155,8 @@ public record struct Glasses
     public readonly bool AppAnchor => Family == GlassesFamily.Aura;
 
     /// <summary>
-    /// Head tracking over USB HID: the Air family models whose stream is known (the Air, Air 2, Air 2 Pro and Air 2
-    /// Ultra), and VITURE glasses (experimental). None of them has been run on a Mac.
+    /// Head tracking over USB HID: the Air family models whose stream is known (the Air, Air 2, Air 2 Pro, Air 2 Ultra,
+    /// and the XBX A01 and A01+, untested), and VITURE glasses (experimental). None of them has been run on a Mac.
     /// </summary>
     public readonly bool HidImu => (Family == GlassesFamily.Air && AirImu.ContainsKey(Product)) || Family == GlassesFamily.Viture;
 

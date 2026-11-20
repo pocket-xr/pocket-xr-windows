@@ -13,7 +13,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\PocketXR.ico</ApplicationIcon>
-    <Version>0.3.1</Version>
+    <Version>0.4.0</Version>
     <Product>Pocket XR</Product>
     <AssemblyTitle>Pocket XR</AssemblyTitle>
     <Company>Pocket XR</Company>
@@ -24,16 +24,29 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The host's sound: Opus in pure C# (BSD 3-clause), and Windows' loopback capture (NAudio, MIT). -->
+    <PackageReference Include="Concentus" Version="2.2.2" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
     <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
     <PackageReference Include="Vortice.DXGI" Version="3.6.2" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.6.2" />
+    <!-- PC screens: Windows' own video decoders (Media Foundation). MIT licence. -->
+    <PackageReference Include="Vortice.MediaFoundation" Version="3.6.2" />
     <!-- Hand tracking: runs MediaPipe's hand models (Hands/Models, Apache 2.0) on the CPU. MIT licence. -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Hands\Models\hand_detector.onnx" LogicalName="PocketXR.Hands.hand_detector.onnx" />
+    <EmbeddedResource Include="PcHost\PocketXR-PC-Screens.ps1" LogicalName="PocketXR.PcScreens.ps1" />
     <EmbeddedResource Include="Hands\Models\hand_landmarks_detector.onnx" LogicalName="PocketXR.Hands.hand_landmarks_detector.onnx" />
+  </ItemGroup>
+
+  <!-- PC screens: Moonlight's stream core (native/moonlight, built by its build.ps1). -->
+  <ItemGroup Condition="Exists('..\..\native\moonlight\bin\moonlight-pxr.dll')">
+    <!-- Beside PocketXR.exe in the download too, not packed into the single file: the app looks for it there. -->
+    <None Include="..\..\native\moonlight\bin\moonlight-pxr.dll" Link="moonlight-pxr.dll" CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <ItemGroup>

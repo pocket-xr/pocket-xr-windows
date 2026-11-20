@@ -18,7 +18,7 @@ namespace PocketXR.Platform;
 /// Samples come out as the network stream's do, so HeadFusion takes them unchanged: gyro in rad/s, accelerometer in
 /// m/s², time in ns. `glasses.Axes` says which axes they are in.
 ///
-/// Which HID device: the Air's IMU is USB interface 3 (2 on the Air 2 Ultra). On Windows each USB interface of the
+/// Which HID device: the Air's IMU is USB interface 3 (2 on the Air 2 Ultra, 1 on the XBX A01 and A01+). On Windows each USB interface of the
 /// glasses is its own HID device, and its path says which interface it is ("&amp;mi_03"), so the IMU's own interface is
 /// found by that and the glasses' other HID interfaces are left alone. VITURE: the Beast's interface 5 first, then
 /// each other HID device of the glasses in turn, as the Deck does. Every candidate seen is logged, so a tester's log

@@ -32,6 +32,14 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - **Hand tracking** (Ctrl+Alt+H): a webcam that faces you makes an air trackpad (move your hand, pinch to click), and
   glasses with a camera Windows can open aim a hand ray. Palm to the camera and a short pinch opens the launcher; a held
   pinch recentres. It runs Google's MediaPipe hand models on the PC, with ONNX Runtime; the picture never leaves the PC.
+- **Another computer in these glasses** (the menu and the control panel): another computer's desktop as one
+  of the floating screens, streamed with Moonlight's protocol from Apollo, Sunshine or Pocket XR for Windows on that
+  computer. For glasses plugged into this PC. Glasses on your phone open PC screens from Pocket XR on the phone. With
+  no glasses plugged into this PC it says so instead of opening anything, and this PC never streams itself.
+- **Let my phone stream this PC** (the control panel and the menu): this PC's screens on your phone's glasses, with no
+  Apollo needed. It also does what the separate Pocket XR PC helper did (finding this PC, pairing with no typing,
+  starting SteamVR for PC VR, Apollo's PINs), so that helper is no longer needed: on first start Pocket XR stops it,
+  takes it out of Windows' start list, and keeps the phones it had paired.
 - Every control has a key that works in any app, all with Ctrl+Alt: R recentre, S Steady mode, = and - size,
   ] and [ distance, . and , curve, L next layout, D 3D, P pointer to the screen you look at, Space the launcher,
   K Pocket mode, H hand tracking.
@@ -48,6 +56,14 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
   also be installed with `winget install --id Parsec.ParsecVDD -e`. SudoVDA (the driver the Apollo streaming app
   installs) works too. Without a driver, the glasses show the PC's own screen. Pocket XR itself never asks for
   administrator rights, and is not made by or affiliated with Parsec.
+- For **Let my phone stream this PC**: a graphics card that encodes video (AV1, HEVC or H.264). Tried on AMD
+  graphics only; NVIDIA and Intel are untested. With SudoVDA on the PC, each stream gets a display of the phone's
+  window shape; without it, the main display is streamed, scaled. Windows asks once whether Pocket XR may use the
+  network: allow it on private networks.
+- PC screens and the host use Moonlight's stream core, `native/moonlight` (moonlight-common-c, GPL-3.0), built into
+  `moonlight-pxr.dll` with Zig's C compiler by `native/moonlight/build.ps1`.
+
+What is new in each version: [docs/release-notes-0.4.0.md](docs/release-notes-0.4.0.md) and the notes beside it.
 
 ## Build
 

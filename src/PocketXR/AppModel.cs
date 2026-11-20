@@ -125,6 +125,8 @@ public sealed class AppState
     public bool Recentred;
     /// <summary>One line saying where things stand, as the tray icon shows it.</summary>
     public string StatusLine = "Plug in your glasses.";
+    /// <summary>"Let my phone stream this PC": where it stands, null while it is off.</summary>
+    public string? PhoneStatus;
     /// <summary>The screen count was changed and needs Pocket XR opened again.</summary>
     public bool NeedsRestart;
     /// <summary>The screens as they are drawn now: where each sits in the Space (moved by hand included).</summary>
@@ -226,6 +228,14 @@ public interface IAppActions
     /// <summary>Lets go of every shortcut while new keys are being pressed in Settings (so Pocket XR's own keys can
     /// be pressed there too), or takes them again.</summary>
     void PauseShortcuts(bool paused);
+    /// <summary>Opens the next PC screen: another computer's desktop streamed into a window (Moonlight's protocol).</summary>
+    void OpenPcScreen() { }
+    /// <summary>"Let my phone stream this PC": this PC's own host and the phone link (what the PC helper was), on or off.</summary>
+    void SetPhoneStreams(bool on) { }
+    /// <summary>Every phone allowed on this PC is forgotten: each asks again, and pairs again with this PC's host.</summary>
+    void ForgetPhones() { }
+    /// <summary>Runs the PC screens setup for Apollo (Windows asks for admin rights).</summary>
+    void SetUpApollo() { }
 }
 
 /// <summary>Actions that do nothing: for windows drawn to picture files.</summary>

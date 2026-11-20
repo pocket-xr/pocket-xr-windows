@@ -13,7 +13,8 @@ public sealed class Log
     public static readonly Log Shared = new();
 
     public string Folder { get; }
-    public string File { get; }
+    public string File { get; private set; }
+    private string baseName = "pocket-xr";
     private readonly object gate = new();
     private FileStream? stream;
     private const long MaxBytes = 4 << 20;
@@ -64,12 +65,27 @@ public sealed class Log
         try
         {
             stream?.Dispose();
-            string old = Path.Combine(Folder, "pocket-xr.1.log");
+            string old = Path.Combine(Folder, baseName + ".1.log");
             if (System.IO.File.Exists(old)) System.IO.File.Delete(old);
             System.IO.File.Move(File, old);
         }
         catch (Exception) { }
         Open();
+    }
+
+    /// <summary>
+    /// This process logs to its own file (%LOCALAPPDATA%\Pocket XR\NAME.log): a PC screen runs as its own process, and
+    /// two processes appending to one file wrote over each other's lines (20 Nov 2026).
+    /// </summary>
+    public void UseFile(string name)
+    {
+        lock (gate)
+        {
+            try { stream?.Dispose(); } catch (Exception) { }
+            baseName = name;
+            File = Path.Combine(Folder, name + ".log");
+            Open();
+        }
     }
 
     /// <summary>Shortcut used everywhere: Log.P("...").</summary>
