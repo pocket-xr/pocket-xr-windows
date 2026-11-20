@@ -8,7 +8,8 @@ rules, no account and no paid tier.
 
 > **What has been tried.** Seen working on 17 November 2026 on a Steam Deck running Windows 11 with the XREAL Aura: floating
 > screens in the glasses, held still by head tracking, in 3D. On 18 November 2026 a tester reported the XREAL 1S working on
-> Windows 11 for hours, in normal and Steady mode. Other glasses have not been tried yet.
+> Windows 11 for hours, in normal and Steady mode. The XREAL XBX A01 and A01+ are recognised for head tracking since
+> 0.4.0, untested. Other glasses have not been tried yet.
 > See "Where it stands" below.
 
 ## How it is meant to work
@@ -105,6 +106,10 @@ never sends a firmware command or a guessed one.
 
 See [docs/PLAN.md](docs/PLAN.md): what was seen working, on what, and when; what is written but has never run with
 glasses; and what is not written yet.
+
+## Thanks
+
+- Pierre Zammit, for his XBX A01+ logs, which led to XBX A01 and A01+ support (0.4.0).
 
 ## Licence
 
