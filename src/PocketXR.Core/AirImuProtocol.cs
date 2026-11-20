@@ -28,6 +28,12 @@ public static class AirImuProtocol
     public const int CmdImuStream = 0x19;
     /// <summary>The Air 2 Ultra, whose IMU is on HID interface 2.</summary>
     public const int Air2Ultra = 0x0426;
+    /// <summary>
+    /// The XBX A01 and A01+: the Air's stream on HID interface 1, the MCU on 0, three 64 byte HID interfaces in all
+    /// (wheaney's nrealAirLinuxDriver hid_ids.c, MIT, and a tester's descriptor of the A01+). Untested: not yet run on
+    /// either, on any system.
+    /// </summary>
+    public const int XbxA01 = 0x0440, XbxA01Plus = 0x0442;
     /// <summary>m/s² in one g: the report's accelerometer unit to the fusion's.</summary>
     public const double G = 9.81;
 
@@ -36,8 +42,13 @@ public static class AirImuProtocol
 
     public static bool IsAir(int vendor, int product) => vendor == Glasses.Xreal && ModelName(product) != null;
 
-    /// <summary>The HID interface the IMU streams on: 3, and 2 on the Air 2 Ultra.</summary>
-    public static int ImuInterface(int product) => product == Air2Ultra ? 2 : 3;
+    /// <summary>The HID interface the IMU streams on: 3, 2 on the Air 2 Ultra, and 1 on the XBX A01 and A01+.</summary>
+    public static int ImuInterface(int product) => product switch
+    {
+        Air2Ultra => 2,
+        XbxA01 or XbxA01Plus => 1,
+        _ => 3,
+    };
 
     /// <summary>
     /// CRC32 as zlib and java.util.zip.CRC32 compute it (polynomial 0xEDB88320, reflected), of [count] bytes from
