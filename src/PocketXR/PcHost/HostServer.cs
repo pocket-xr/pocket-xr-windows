@@ -64,6 +64,9 @@ internal sealed class HostServer : IDisposable
         public HostControl? Control;
         public long Started;
         public Timer? Stats;
+        /// <summary>Held while the display, sound and encoder are made after PLAY, so a stop waits for them.</summary>
+        public readonly object Making = new();
+        public volatile bool Stopped;
     }
 
     public HostServer(int basePort, string? displayName, string? name = null)
@@ -196,6 +199,12 @@ internal sealed class HostServer : IDisposable
     private void Stop(Session s, string why)
     {
         Log.P($"host: session ended ({why})");
+        s.Stopped = true;
+        lock (s.Making) StopParts(s);
+    }
+
+    private static void StopParts(Session s)
+    {
         s.Stats?.Dispose();
         s.Control?.Terminate();
         Thread.Sleep(100);
@@ -279,16 +288,48 @@ internal sealed class HostServer : IDisposable
             $"FEC minimum {s.MinFec}, encryption {enc}, bitstream {format}");
     }
 
+    /// <summary>
+    /// PLAY: the video and control ports open now, and PLAY is answered at once; the display, sound and encoder are
+    /// made afterwards (about half a second), so the phone connects its streams meanwhile. Answering after all of it
+    /// held every start back by that time (20 Nov 2026).
+    /// </summary>
     private void Begin(Session s)
     {
-        if (s.Encoder != null) return;
+        if (s.Video != null) return;
         s.Started = Stopwatch.GetTimestamp();
         s.Video = new HostVideo(VideoPort, s.PacketSize, 20, s.MinFec);
         s.Control = new HostControl(ControlPort, s.Key);
         s.Control.Input = m => HostInput.Handle(m.Span);
+        s.Control.KeyFrameWanted = () => s.Encoder?.RequestIdr();
+        s.Video.FirstClient = () =>
+        {
+            s.Encoder?.RequestIdr(); // the encoder's first picture is a key frame anyway, if it is not made yet
+            HostInput.Centre(); // the pointer starts on the streamed display
+        };
+        s.Control.Gone = () => new Thread(() => EndSession("the phone went")) { IsBackground = true }.Start();
+        new Thread(() =>
+        {
+            try
+            {
+                lock (s.Making)
+                {
+                    if (s.Stopped) return;
+                    Make(s);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.P($"host: the stream could not start: {e.Message}");
+                new Thread(() => { lock (gate) if (session == s) EndSession("it could not start"); }) { IsBackground = true }.Start();
+            }
+        }) { IsBackground = true, Name = "Host-start" }.Start();
+    }
+
+    private void Make(Session s)
+    {
         string? display = displayName;
         if (display == null && s.VirtualWanted && MakesScreens) display = MakeScreen(s);
-        var video = s.Video;
+        var video = s.Video!;
         long first = 0;
         s.Encoder = new HostEncoder(display, s.Width, s.Height, s.Fps, s.BitrateKbps, (frame, idr, taken) =>
         {
@@ -301,17 +342,10 @@ internal sealed class HostServer : IDisposable
             }
             video.Send(frame, idr, latency);
         }, s.Codec);
-        s.Control.KeyFrameWanted = s.Encoder.RequestIdr;
-        var encoder = s.Encoder;
-        s.Video.FirstClient = () =>
-        {
-            encoder.RequestIdr();
-            HostInput.Centre(); // the pointer starts on the streamed display
-        };
         s.Audio = new HostAudio(AudioPort, s.AudioMs, s.AudioEncrypted, s.Key, s.KeyId);
         s.Audio.Start();
-        s.Control.Gone = () => new Thread(() => EndSession("the phone went")) { IsBackground = true }.Start();
         s.Encoder.Start();
+        Log.P($"host: display, sound and encoder ready {(Stopwatch.GetTimestamp() - s.Started) * 1000 / Stopwatch.Frequency} ms after PLAY");
         long lastFrames = 0, lastBytes = 0, lastNeeds = 0, lastOuts = 0, lastKeys = 0, lastOutBytes = 0;
         double lastMs = 0;
         s.Stats = new Timer(_ =>
