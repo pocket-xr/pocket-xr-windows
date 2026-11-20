@@ -180,6 +180,30 @@ public static class Displays
         return set == 0;
     }
 
+    /// <summary>
+    /// Sets a display's size (and refresh rate where it has it). A virtual display made again with the same id comes
+    /// back at the size Windows remembered for it, not the size asked for (the host's displays, 20 Nov 2026: made at
+    /// 1784x976, shown at 1280x720), so the size is set after it appears. Kept by Windows for next time. 0 on success.
+    /// </summary>
+    public static int SetMode(string gdiName, int width, int height, int hz)
+    {
+        var dm = new DevMode { dmSize = (ushort)Marshal.SizeOf<DevMode>(), dmDeviceName = "", dmFormName = "" };
+        if (!EnumDisplaySettingsW(gdiName, -1, ref dm)) return -1;
+        dm.dmPelsWidth = (uint)width;
+        dm.dmPelsHeight = (uint)height;
+        dm.dmDisplayFrequency = (uint)hz;
+        dm.dmFields = 0x80000 | 0x100000 | 0x400000; // width, height, frequency
+        const uint CdsUpdateRegistry = 0x1;
+        int r = ChangeDisplaySettingsExW(gdiName, ref dm, IntPtr.Zero, CdsUpdateRegistry, IntPtr.Zero);
+        if (r != 0)
+        {
+            // That rate not offered: the size alone.
+            dm.dmFields = 0x80000 | 0x100000;
+            r = ChangeDisplaySettingsExW(gdiName, ref dm, IntPtr.Zero, CdsUpdateRegistry, IntPtr.Zero);
+        }
+        return r;
+    }
+
     [DllImport("user32.dll", EntryPoint = "SetDisplayConfig")]
     private static extern int SetDisplayConfig(uint pathCount, [In] byte[] paths, uint modeCount, [In] byte[] modes, uint flags);
 

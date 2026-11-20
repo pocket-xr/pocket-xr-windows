@@ -20,6 +20,7 @@ public static class Program
     /// PocketXR --driver             the virtual display driver's own details (changes nothing)
     /// PocketXR --quit               asks the running copy to quit and put the glasses back
     /// PocketXR --stand-in N         a test: monitor N (not the main one) stands in for the glasses' display
+    /// PocketXR --pc-screen N [--host ADDRESS[:PORT]] [--at X Y W H]  PC screen N: another computer's desktop, streamed
     /// </summary>
     [STAThread]
     public static int Main(string[] args)
@@ -51,6 +52,14 @@ public static class Program
                         new System.Windows.Application();
                         return AppIcon.Make(args.Length > 1 ? args[1] : "PocketXR.ico");
                     case "--driver-test": return Tools.DriverTest(args.Length > 1 && double.TryParse(args[1], out double d) ? d : 8);
+                    case "--pc-screen": return PcScreens.PcScreenSession.Run(args);
+                    case "--host": return PcHost.HostServer.RunCommand(args);
+                    case "--host-encoder-test": return PcHost.HostServer.EncoderTest(args);
+                    case "--host-clipboard-test": return PcHost.HostServer.ClipboardTest(args);
+                    case "--host-pin": return PcHost.HostServer.GivePin(args);
+                    case "--host-stop": return PcHost.HostServer.StopCommand();
+                    case "--pc-screen-tls": return PcScreens.PcScreenSession.TlsReport(args);
+                    case "--pc-screens-find": return PcScreens.PcScreenSession.FindReport();
                     default:
                         Console.Error.WriteLine($"Pocket XR does not know {args[0]}.");
                         return 2;

@@ -226,6 +226,8 @@ public interface IAppActions
     /// <summary>Lets go of every shortcut while new keys are being pressed in Settings (so Pocket XR's own keys can
     /// be pressed there too), or takes them again.</summary>
     void PauseShortcuts(bool paused);
+    /// <summary>Opens the next PC screen: another computer's desktop streamed into a window (Moonlight's protocol).</summary>
+    void OpenPcScreen() { }
 }
 
 /// <summary>Actions that do nothing: for windows drawn to picture files.</summary>

@@ -14,6 +14,7 @@ TourChecks.Run();
 ControllerChecks.Run();
 LauncherChecks.Run();
 HandChecks.Run();
+PcScreenChecks.Run();
 
 Console.WriteLine(Check.Failures == 0
     ? $"core checks: all {Check.Checks} passed"

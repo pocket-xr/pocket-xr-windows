@@ -1233,9 +1233,20 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         });
     }
 
+    public void OpenPcScreen()
+    {
+        if (!PcScreens.PcScreenLauncher.Available)
+        {
+            Log.P("pc screens: Moonlight's core (moonlight-pxr.dll) is not beside the app");
+            return;
+        }
+        PcScreens.PcScreenLauncher.OpenNext(floating);
+    }
+
     public void Quit()
     {
         Log.P("quit");
+        PcScreens.PcScreenLauncher.CloseAll();
         Leave(() => app.Shutdown());
     }
 
