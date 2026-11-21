@@ -403,6 +403,13 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     public bool GrabKeys = true;
     /// <summary>"Let my phone stream this PC" (Windows): this PC's own host, and the phone link the PC helper was.</summary>
     public bool PhoneStreamsPc = false;
+    /// <summary>Readability (ReadabilityMode): one 1440 x 810 screen, as wide as one pixel per glasses pixel.</summary>
+    public bool Readability = false;
+    /// <summary>What Readability changed, kept to put back when it goes off (null while it is off).</summary>
+    public int? ReadabilityBeforeScreens;
+    public double? ReadabilityBeforeWidthDeg;
+    public List<double>? ReadabilityBeforeScreenYawDeg;
+    public List<double>? ReadabilityBeforeScreenPitchDeg;
     /// <summary>The PC helper as its own program has been moved over to the app once (Windows).</summary>
     public bool PhoneHelperMovedOver = false;
 
@@ -429,6 +436,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         s.ScreenYawDeg = new List<double>(ScreenYawDeg);
         s.ScreenPitchDeg = new List<double>(ScreenPitchDeg);
         s.PinnedApps = new List<string>(PinnedApps);
+        if (ReadabilityBeforeScreenYawDeg != null) s.ReadabilityBeforeScreenYawDeg = new List<double>(ReadabilityBeforeScreenYawDeg);
+        if (ReadabilityBeforeScreenPitchDeg != null) s.ReadabilityBeforeScreenPitchDeg = new List<double>(ReadabilityBeforeScreenPitchDeg);
         return s;
     }
 
@@ -577,6 +586,11 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         GrabKeys = other.GrabKeys;
         PhoneStreamsPc = other.PhoneStreamsPc;
         PhoneHelperMovedOver = other.PhoneHelperMovedOver;
+        Readability = other.Readability;
+        ReadabilityBeforeScreens = other.ReadabilityBeforeScreens;
+        ReadabilityBeforeWidthDeg = other.ReadabilityBeforeWidthDeg;
+        ReadabilityBeforeScreenYawDeg = other.ReadabilityBeforeScreenYawDeg != null ? new List<double>(other.ReadabilityBeforeScreenYawDeg) : null;
+        ReadabilityBeforeScreenPitchDeg = other.ReadabilityBeforeScreenPitchDeg != null ? new List<double>(other.ReadabilityBeforeScreenPitchDeg) : null;
     }
 
     public bool Equals(SpaceSettings? other)
@@ -598,6 +612,10 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             && PinnedApps.SequenceEqual(other.PinnedApps) && PinsChosen == other.PinsChosen
             && ControllerMode == other.ControllerMode && HandsOn == other.HandsOn && HandAim == other.HandAim
             && GrabKeys == other.GrabKeys && PhoneStreamsPc == other.PhoneStreamsPc
+            && Readability == other.Readability && ReadabilityBeforeScreens == other.ReadabilityBeforeScreens
+            && ReadabilityBeforeWidthDeg == other.ReadabilityBeforeWidthDeg
+            && SpaceSettingsJson.SameList(ReadabilityBeforeScreenYawDeg, other.ReadabilityBeforeScreenYawDeg)
+            && SpaceSettingsJson.SameList(ReadabilityBeforeScreenPitchDeg, other.ReadabilityBeforeScreenPitchDeg)
             && PhoneHelperMovedOver == other.PhoneHelperMovedOver;
     }
 
@@ -679,8 +697,14 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("handAim", x => x.WriteStringValue(HandAim.RawValue())),
             ("grabKeys", x => x.WriteBooleanValue(GrabKeys)),
             ("phoneStreamsPc", x => x.WriteBooleanValue(PhoneStreamsPc)),
+            ("readability", x => x.WriteBooleanValue(Readability)),
             ("phoneHelperMovedOver", x => x.WriteBooleanValue(PhoneHelperMovedOver)),
         };
+        // What Readability changed, only while it is on.
+        if (ReadabilityBeforeScreens is int rs) entries.Add(("readabilityBeforeScreens", x => x.WriteNumberValue(rs)));
+        if (ReadabilityBeforeWidthDeg is double rw) entries.Add(("readabilityBeforeWidthDeg", x => x.WriteNumberValue(rw)));
+        if (ReadabilityBeforeScreenYawDeg is List<double> ry) entries.Add(("readabilityBeforeScreenYawDeg", x => SpaceSettingsJson.WriteDoubles(x, ry)));
+        if (ReadabilityBeforeScreenPitchDeg is List<double> rp) entries.Add(("readabilityBeforeScreenPitchDeg", x => SpaceSettingsJson.WriteDoubles(x, rp)));
         SpaceSettingsJson.WriteObject(w, entries, sorted);
     }
 
@@ -744,6 +768,11 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         if (SpaceSettingsJson.Has(c, "panelAtStart", out v)) s.PanelAtStart = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "grabKeys", out v)) s.GrabKeys = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "phoneStreamsPc", out v)) s.PhoneStreamsPc = SpaceSettingsJson.Bool(v);
+        if (SpaceSettingsJson.Has(c, "readability", out v)) s.Readability = SpaceSettingsJson.Bool(v);
+        if (SpaceSettingsJson.Has(c, "readabilityBeforeScreens", out v)) s.ReadabilityBeforeScreens = SpaceSettingsJson.Int(v);
+        if (SpaceSettingsJson.Has(c, "readabilityBeforeWidthDeg", out v)) s.ReadabilityBeforeWidthDeg = SpaceSettingsJson.Double(v);
+        if (SpaceSettingsJson.Has(c, "readabilityBeforeScreenYawDeg", out v)) s.ReadabilityBeforeScreenYawDeg = SpaceSettingsJson.Doubles(v);
+        if (SpaceSettingsJson.Has(c, "readabilityBeforeScreenPitchDeg", out v)) s.ReadabilityBeforeScreenPitchDeg = SpaceSettingsJson.Doubles(v);
         if (SpaceSettingsJson.Has(c, "phoneHelperMovedOver", out v)) s.PhoneHelperMovedOver = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "pinnedApps", out v))
         {
