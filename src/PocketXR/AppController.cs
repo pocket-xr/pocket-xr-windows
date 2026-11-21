@@ -500,9 +500,12 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     {
         if (standIn != null || !State.DriverReady) return;
         int wanted = Store.S.Screens;
-        if (displays != null && displays.Screens.Count == wanted) return;
+        // Readability: the screen drawn at 1440 x 810 (ReadabilityMode), else 1920 x 1080.
+        var size = ReadabilityMode.ScreenSize(Store.S.Readability);
+        if (displays != null && displays.Screens.Count == wanted && madeSize == size) return;
         displays?.Dispose();
-        displays = VirtualDisplays.Make(wanted, 1920, 1080, 60, out string why);
+        madeSize = size;
+        displays = VirtualDisplays.Make(wanted, size.Width, size.Height, 60, out string why);
         if (displays == null)
         {
             Log.P($"virtual displays: not made: {why}");
@@ -517,8 +520,24 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             if (floating.Count == wanted) break;
             Thread.Sleep(100);
         }
-        Log.P($"virtual displays: {floating.Count} of {wanted} are on the desktop");
+        // Windows may bring a display back at the size it remembered for it: set the one wanted.
+        foreach (DisplayInfo d in floating.ToList())
+        {
+            if (d.Width == size.Width && d.Height == size.Height) continue;
+            int r = Displays.SetMode(d.GdiName, size.Width, size.Height, 60);
+            Log.P($"virtual displays: {d.GdiName} came at {d.Width}x{d.Height}: set to {size.Width}x{size.Height} ({(r == 0 ? "done" : $"refused, {r}")})");
+        }
+        if (floating.Any(d => d.Width != size.Width || d.Height != size.Height))
+        {
+            Thread.Sleep(300);
+            RefreshFloating(Displays.List());
+        }
+        Log.P($"virtual displays: {floating.Count} of {wanted} are on the desktop, " +
+            string.Join(", ", floating.Select(d => $"{d.Width}x{d.Height}")));
     }
+
+    /// <summary>The size the floating screens were made at.</summary>
+    private (int Width, int Height) madeSize = (1920, 1080);
 
     // MARK: settings
 
@@ -532,7 +551,14 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             ResetScreenMoves();
             return;
         }
-        if (old.Screens != now.Screens && glassesDisplay != null && standIn == null)
+        if (old.Readability != now.Readability)
+        {
+            // Logged with what it changed: before and after.
+            Log.P(now.Readability
+                ? $"readability: on: {ReadabilityMode.Line(old)} -> {ReadabilityMode.Line(now)}, screen {ReadabilityMode.Width}x{ReadabilityMode.Height}"
+                : $"readability: off: {ReadabilityMode.Line(old)} -> {ReadabilityMode.Line(now)}, screens 1920x1080");
+        }
+        if ((old.Screens != now.Screens || old.Readability != now.Readability) && glassesDisplay != null && standIn == null)
         {
             Log.P($"screens: {now.Screens}");
             picture?.Dispose();

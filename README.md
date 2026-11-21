@@ -28,6 +28,12 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - **Settings**: a live picture of your Space, eye distance, brightness, the glow around the screen you look at, edge
   fade, tracking (Body Anchor or Smooth Follow), head scroll, the tracking readings, a Glasses report, settings saved
   to and restored from a file, open when you sign in.
+- **Readability** (Settings, Picture; off by default; untested on glasses): larger, sharp text on 1080p glasses. One
+  floating screen drawn at 1440 x 810, shown just wide enough that one of its pixels covers about one of the glasses'
+  (about 32 degrees on the XREAL Air, 51 on the Aura, 30 if the glasses are not known). It changes only the screen
+  count, the screens' width and screens moved by hand, keeps what they were, and puts exactly those back when turned
+  off; both are logged with the values before and after. After an idea by Dmitriy Cherdantsev, a Pocket XR for Mac
+  tester.
 - **Tour**: eight steps, opens the first time.
 - **Launcher** (Ctrl+Alt+Space), **Pocket mode** (Ctrl+Alt+K), a **game controller** as a remote.
 - **Hand tracking** (Ctrl+Alt+H): a webcam that faces you makes an air trackpad (move your hand, pinch to click), and
