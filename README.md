@@ -70,7 +70,7 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - PC screens and the host use Moonlight's stream core, `native/moonlight` (moonlight-common-c, GPL-3.0), built into
   `moonlight-pxr.dll` with Zig's C compiler by `native/moonlight/build.ps1`.
 
-What is new in each version: [docs/release-notes-0.4.2.md](docs/release-notes-0.4.2.md) and the notes beside it.
+What is new in each version: [docs/release-notes-0.4.3.md](docs/release-notes-0.4.3.md) and the notes beside it.
 
 ## Build
 
@@ -116,7 +116,8 @@ glasses; and what is not written yet.
 ## Thanks
 
 - Pierre Zammit, for his XBX A01+ logs, which led to XBX A01 and A01+ support (0.4.0) and to waking their control chip
-  first (0.4.1), and to finding its display (0.4.2).
+  first (0.4.1), and to finding its display (0.4.2); and for his report of the control panel running off a second
+  screen (0.4.3).
 
 ## Licence
 

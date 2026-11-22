@@ -54,5 +54,15 @@ public static class ReadabilityChecks
         Check.That(plain.Equals(new SpaceSettings()), "off when off changes nothing");
         Check.That(!new SpaceSettings().Readability, "off by default");
         Check.That(ReadabilityMode.Line(before) == "3 screens, 44° wide, screens moved 0 5.5 -3", $"the log line ({ReadabilityMode.Line(before)})");
+
+        // Windows kept on their screen (the control panel on a 1080p screen at 125 %, its taskbar 60 px: Pierre Zammit's
+        // "Second screen only" case, 22 Nov 2026).
+        Check.That(Math.Abs(WindowFit.MaxHeight(0, 1020, 1.25) - (816 - 12)) < 0.01, "the control panel's height is held to its own screen at its scale");
+        Check.That(WindowFit.MaxHeight(0, 300, 1.0) == 320, "never under 320");
+        Check.That(WindowFit.Place(100, 400, 550, 1100, 0, 0, 1920, 1020) == (100, 0), "a window taller than the screen starts at its top");
+        Check.That(WindowFit.Place(100, 500, 550, 700, 0, 0, 1920, 1020) == (100, 320), "a window running off the bottom is moved up");
+        Check.That(WindowFit.Place(1700, 100, 550, 700, 0, 0, 1920, 1020) == (1370, 100), "and off the right, moved left");
+        Check.That(WindowFit.Place(-1500, 100, 550, 700, -1920, 0, 0, 1080) == (-1500, 100), "a window already on a screen left of the main one stays");
+        Check.That(WindowFit.Place(2000, 1200, 550, 700, 1920, 0, 3840, 1080) == (2000, 380), "on a second screen, kept on that screen");
     }
 }
