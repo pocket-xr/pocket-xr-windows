@@ -43,6 +43,7 @@ public static class Tools
     {
         List<UsbDeviceInfo> usb = UsbDevices.List();
         Glasses? g = Glasses.Detect(usb);
+        Glasses.SetUsbName(Glasses.UsbName(usb, g));
         Console.WriteLine(g is Glasses found
             ? $"Glasses: {found.Name} ({found.Vendor:X4}:{found.Product:X4})"
             : "Glasses: none that Pocket XR knows are plugged in");

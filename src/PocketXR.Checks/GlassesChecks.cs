@@ -343,6 +343,19 @@ public static class GlassesChecks
         Check.That(aura?.SteadyCapable == true && aura?.SixDofCapable == true && aura?.AppAnchor == true, "the Aura: Steady mode, 6DoF, its anchor set by the app");
         Check.That(aura?.HidImu == false && aura?.TrackingOnMac == true && aura?.Managed == true, "the Aura tracks over the network and is managed");
 
+        // The glasses' display by name: a maker's name, "XBX", or the plugged-in glasses' USB product name.
+        Check.That(Glasses.IsGlassesScreenName("XREAL Air 2", null) && Glasses.IsGlassesScreenName("VITURE Pro", null), "a maker's name is the glasses");
+        Check.That(Glasses.IsGlassesScreenName("xbx a01+", null), "the XBX A01+'s display, \"xbx a01+\", is the glasses");
+        Check.That(!Glasses.IsGlassesScreenName("DELL U2720Q", null) && !Glasses.IsGlassesScreenName("Generic PnP Monitor", null), "a monitor is not");
+        Check.That(Glasses.IsGlassesScreenName("Some Glasses 2", "some glasses 2"), "a display named as the plugged-in glasses' USB name is the glasses");
+        Check.That(Glasses.IsGlassesScreenName("SOME GLASSES 2", " Some Glasses 2 "), "ignoring case and spaces around it");
+        Check.That(!Glasses.IsGlassesScreenName("Some Glasses 2", null), "but not without glasses plugged in");
+        Check.That(!Glasses.IsGlassesScreenName("DELL U2720Q", "u2"), "a USB name under 4 letters is not used");
+        var xbxUsb = new[] { new UsbDeviceInfo(vendor: 0x3318, product: 0x0442, interfaceClasses: new[] { 0x03 }, name: "xbx a01+") };
+        Glasses? xbxFound = Glasses.Detect(xbxUsb);
+        Check.That(Glasses.UsbName(xbxUsb, xbxFound) == "xbx a01+", "the plugged-in glasses' USB name is found");
+        Check.That(Glasses.UsbName(xbxUsb, null) == null, "and none with no glasses");
+
         // The XBX A01+ (a tester's, USB 3318:0442: three HID interfaces) is Air family, tracked over USB HID.
         Glasses? xbx = Found(0x0442, classes: new[] { 0x03, 0x03, 0x03 });
         Check.That(xbx?.Family == GlassesFamily.Air && xbx?.Name == "XREAL XBX A01+", "the XBX A01+ is found as Air family");
