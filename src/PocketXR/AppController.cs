@@ -231,6 +231,8 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         KeepWindowsOnOwnScreen();
         List<UsbDeviceInfo> usb = UsbDevices.List();
         Glasses? found = Glasses.Detect(usb);
+        // Their USB product name also names their display on some models (the XBX A01+: "xbx a01+").
+        Glasses.SetUsbName(Glasses.UsbName(usb, found));
         if (!Nullable.Equals(found, glasses))
         {
             Log.P($"glasses: {found?.Name ?? "none"} (USB: {UsbDevices.Describe(usb.Where(d => d.Vendor == Glasses.Xreal || d.Vendor == Glasses.Viture))})");

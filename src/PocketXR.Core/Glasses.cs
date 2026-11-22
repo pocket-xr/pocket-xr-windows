@@ -208,11 +208,38 @@ public record struct Glasses
         return null;
     }
 
-    /// <summary>The glasses' display among the PC's screens, by name ("XREAL AURA", "XREAL One", "VITURE ..."), else null.</summary>
-    public static bool IsGlassesScreenName(string name)
+    /// <summary>
+    /// The plugged-in glasses' USB product name ("xbx a01+"), set by the app when it finds them, so a display named
+    /// after the glasses themselves is known too. Null with no glasses.
+    /// </summary>
+    private static volatile string? usbName;
+
+    /// <summary>Sets (or with null clears) the plugged-in glasses' USB product name.</summary>
+    public static void SetUsbName(string? name) => usbName = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+
+    /// <summary>The USB product name of [glasses] among [devices], or null.</summary>
+    public static string? UsbName(IReadOnlyList<UsbDeviceInfo> devices, Glasses? glasses)
+    {
+        if (glasses is not Glasses g) return null;
+        string? name = First(devices, d => d.Vendor == g.Vendor && d.Product == g.Product)?.Name;
+        return string.IsNullOrWhiteSpace(name) ? null : name;
+    }
+
+    /// <summary>Whether a display's name is the glasses' ("XREAL AURA", "XREAL One", "VITURE ...", "xbx a01+"), or the
+    /// plugged-in glasses' own USB product name.</summary>
+    public static bool IsGlassesScreenName(string name) => IsGlassesScreenName(name, usbName);
+
+    /// <summary>
+    /// The glasses' display by name: a known maker's or model's name, or [glassesUsbName] (the plugged-in glasses' USB
+    /// product name, 4 letters or more), ignoring case. The XREAL XBX A01+ names its display "xbx a01+", with no maker's
+    /// name in it (Pierre Zammit's PC, 21 Nov 2026).
+    /// </summary>
+    public static bool IsGlassesScreenName(string name, string? glassesUsbName)
     {
         string n = name.ToUpperInvariant();
-        return n.Contains("XREAL") || n.Contains("NREAL") || n.Contains("VITURE") || n.Contains("ROKID")
-            || n.Contains("RAYNEO");
+        if (n.Contains("XREAL") || n.Contains("NREAL") || n.Contains("VITURE") || n.Contains("ROKID")
+            || n.Contains("RAYNEO") || n.Contains("XBX")) return true;
+        string? u = glassesUsbName?.Trim();
+        return u is { Length: >= 4 } && n.Contains(u.ToUpperInvariant());
     }
 }
