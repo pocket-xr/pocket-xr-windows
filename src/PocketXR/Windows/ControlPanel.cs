@@ -34,11 +34,14 @@ public static class ControlPanel
             Content = column, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false,
         };
-        var w = new PxWindow("Pocket XR", scroll, StripRight(state, binder))
+        // Its height can be changed (its width stays), and it never runs past the bottom of the screen it is on:
+        // what does not fit scrolls (ScreenFit).
+        var w = new PxWindow("Pocket XR", scroll, StripRight(state, binder), resizable: true)
         {
-            Width = Width, SizeToContent = SizeToContent.Height,
+            Width = Width, MinWidth = Width, MaxWidth = Width, MinHeight = 320, SizeToContent = SizeToContent.Height,
             MaxHeight = Math.Max(SystemParameters.WorkArea.Height - 12, 320),
         };
+        ScreenFit.Keep(w);
         store.Changed += (_, _) => binder.Sync();
         state.Changed += binder.Sync;
         return w;

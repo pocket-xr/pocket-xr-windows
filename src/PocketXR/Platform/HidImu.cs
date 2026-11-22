@@ -59,6 +59,10 @@ public sealed class HidImuReader
     /// <summary>Samples read since Start().</summary>
     public int Samples => Volatile.Read(ref samples);
 
+    private volatile string note = "starting";
+    /// <summary>What the reader is doing now, for the glasses report: "trying interface 1, with the MCU heartbeat".</summary>
+    public string Note => note;
+
     /// <summary>"USB HID (XREAL Air 2)" once reports arrive, else null.</summary>
     public string? ConnectedVia { get { lock (gate) return connectedVia; } }
 
@@ -108,6 +112,7 @@ public sealed class HidImuReader
             List<Candidate> order = Ordered(found);
             if (order.Count == 0)
             {
+                note = found.Count == 0 ? "no HID device of the glasses listed by Windows" : "none of the glasses' HID devices is the motion sensor";
                 Wait(2.0);
                 continue;
             }
@@ -130,6 +135,7 @@ public sealed class HidImuReader
                     }
                 }
             }
+            if (!streamed && !stopped) note = $"no interface sent samples ({found.Count} HID devices listed); trying again";
             if (!streamed && !stopped) Log.P($"hid imu: no interface sent samples; trying again in {(air && AirImuProtocol.IsXbx(glasses.Product) ? 10 : 3)} s");
             Wait(streamed ? 1.0 : air && AirImuProtocol.IsXbx(glasses.Product) ? 10.0 : 3.0);
         }
@@ -156,6 +162,7 @@ public sealed class HidImuReader
                 if (mcu == null && number == AirImuProtocol.ImuInterface(glasses.Product)) continue;
             }
             tryNote = $"interface {number}{(mcu != null ? ", with the MCU heartbeat" : "")}";
+            note = $"trying {tryNote}";
             if (Session(byNumber[number]))
             {
                 streamed = true;
@@ -251,6 +258,7 @@ public sealed class HidImuReader
         if (device.IsInvalid)
         {
             int error = Marshal.GetLastWin32Error();
+            note = $"could not open {(c.Interface is int ni ? $"interface {ni}" : "the device")} (error {error})";
             Log.P($"hid imu: could not open {c.Line}: {(error is 5 or 32 ? "Windows did not allow it (another app, such as the glasses maker's own, may hold the device)" : $"error {error}")}");
             return false;
         }
@@ -363,6 +371,7 @@ public sealed class HidImuReader
                     string model = glasses.Family == GlassesFamily.Air ? AirImuProtocol.ModelName(glasses.Product) ?? glasses.Name : glasses.Name;
                     lock (gate) connectedVia = $"USB HID ({model})";
                     Log.P($"hid imu: samples arriving from {c.Line}{(tryNote.Length > 0 ? $" ({tryNote})" : "")}");
+                    note = $"samples arriving{(tryNote.Length > 0 ? $" on {tryNote}" : "")}";
                 }
                 double quietFor = Stopwatch.GetElapsedTime(sessionSamples > 0 ? lastSample : askedAt).TotalSeconds;
                 if (quietFor < 2.0) continue;

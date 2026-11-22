@@ -928,6 +928,10 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
                 if (State.Steady) parts.Add("Steady mode");
                 else if (State.TrackingOn) parts.Add("head tracking on");
                 else if (headPose != null) parts.Add("head tracking starting");
+                // Glasses whose head tracking is the USB HID switch, with it off: say where it is (it is off by
+                // default, and a tester's XBX report read only "0 reports a second via nothing", 22 Nov 2026).
+                else if (glasses is Glasses gh && gh.HidImu && !gh.NetworkImu && !Store.S.HidTracking)
+                    parts.Add("head tracking off: turn it on in Settings, Experimental");
                 if (State.Stereo && !State.Steady) parts.Add("3D");
                 parts.Add($"{(int)Math.Round(State.Fps)} fps");
             }
@@ -1069,6 +1073,8 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
                     w.Left = area.Left + (area.Width - w.ActualWidth) / 2;
                     w.Top = area.Top + Math.Max((area.Height - w.ActualHeight) / 2, 0);
                 };
+                // Every window stays on the screen it is on (the control panel also caps its own height).
+                if (what != "control panel") ScreenFit.Keep(window, height: false);
             }
             if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
             window.Show();
@@ -1188,6 +1194,11 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         List<UsbDeviceInfo> usb = UsbDevices.List();
         List<string> shown = Displays.List().Select(d => $"{(d.Name.Length > 0 ? d.Name : d.GdiName)}: {d.Width} x {d.Height}, {Math.Round(d.RefreshHz)} Hz").ToList();
         string tracking = $"{State.ImuHz} reports a second via {imu?.ConnectedVia ?? hidImu?.ConnectedVia ?? "nothing"}, bias {(State.BiasReady ? "learnt" : "learning")}";
+        // USB HID glasses: whether the switch is on, and what the reader is doing (an XBX report could not tell).
+        if (glasses is Glasses gh && gh.HidImu && !gh.NetworkImu)
+            tracking += Store.S.HidTracking
+                ? $"; USB HID head tracking on: {hidImu?.Note ?? "not started"}"
+                : "; USB HID head tracking is off (Settings, Experimental, \"Head tracking for XREAL Air, XBX A01 and VITURE (USB HID)\")";
         string text = GlassesReport.Text(State.Version, RuntimeInformation.OSDescription, glasses, usb,
             GlassesNet.Routes().Select(r => r.Description).ToList(), shown, settings == null ? null : settingsState, tracking);
         string stamp = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
