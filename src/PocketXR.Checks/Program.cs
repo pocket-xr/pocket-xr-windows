@@ -16,6 +16,7 @@ LauncherChecks.Run();
 HandChecks.Run();
 PcScreenChecks.Run();
 ReadabilityChecks.Run();
+TapChecks.Run();
 
 Console.WriteLine(Check.Failures == 0
     ? $"core checks: all {Check.Checks} passed"

@@ -28,6 +28,12 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - **Settings**: a live picture of your Space, eye distance, brightness, the glow around the screen you look at, edge
   fade, tracking (Body Anchor or Smooth Follow), head scroll, the tracking readings, a Glasses report, settings saved
   to and restored from a file, open when you sign in.
+- **Taps on the glasses** (Settings, Head tracking; off by default; untested with real taps): tap the frame twice to
+  recentre, three times for the next layout (the closest to the Steam Deck's "switch view": the layout is the one view
+  change every model has, the same as Ctrl+Alt+L). Read from the glasses' own motion sensor, for every model whose head
+  tracking Pocket XR reads, with the Steam Deck's detector and thresholds: a jolt of 0.8 g or more from the 30 ms
+  average, quiet before it, back within 40 ms, while the head turns slower than 60 degrees a second, in runs of 2 or 3.
+  Asked for by Pierre Zammit.
 - **Readability** (Settings, Picture; off by default; untested on glasses): larger, sharp text on 1080p glasses. One
   floating screen drawn at 1440 x 810, shown just wide enough that one of its pixels covers about one of the glasses'
   (about 32 degrees on the XREAL Air, 51 on the Aura, 30 if the glasses are not known). It changes only the screen
