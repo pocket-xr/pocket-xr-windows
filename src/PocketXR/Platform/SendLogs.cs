@@ -19,6 +19,14 @@ public static class SendLogs
 {
     public const string Email = "connect@mikehaye.com";
 
+    /// <summary>When this copy of Pocket XR started: a log from a copy left running since before an update says so
+    /// (a tester's 0.4.1 ran from 22 to 23 Nov after 0.4.3 was out).</summary>
+    private static string StartedAt()
+    {
+        try { return Process.GetCurrentProcess().StartTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture); }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { return "at a time Windows did not give"; }
+    }
+
     public static void Run(string version)
     {
         string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
@@ -39,7 +47,7 @@ public static class SendLogs
                 }
                 string about =
                     "Pocket XR for Windows logs, sent with Send logs to Mike\n" +
-                    $"Version: {version}\n" +
+                    $"Version: {version} (the copy running now, started {StartedAt()})\n" +
                     $"Windows: {RuntimeInformation.OSDescription}\n" +
                     $"PC: {RuntimeInformation.OSArchitecture}, {Environment.ProcessorCount} processors\n" +
                     "Taken out of every line: email addresses, the Windows user name, and IP addresses other than the glasses' own link (169.254.x.x).\n";
