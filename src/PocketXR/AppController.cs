@@ -175,6 +175,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             Store.Update(s => { s.PhoneStreamsPc = true; s.PhoneHelperMovedOver = true; if (atSignIn) s.LaunchAtLogin = true; });
         }
         if (Store.S.PhoneStreamsPc) StartPhone();
+        if (Store.S.Taps) SetTaps(true);
         if (Tour.OpensByItself(Store.S.TourSeen))
         {
             var later = new DispatcherTimer { Interval = TimeSpan.FromSeconds(0.6) };
@@ -435,18 +436,43 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         fusion = f;
         headPose = new HeadPose(f);
         SetScrollRange();
+        // Every report also goes to the taps, while that switch is on (read on the reader's thread).
+        void Report(ImuSample s)
+        {
+            f.Report(s);
+            taps?.Feed(s);
+        }
         if (useHid)
         {
-            var r = new HidImuReader(g, s => f.Report(s));
+            var r = new HidImuReader(g, Report);
             r.Start();
             hidImu = r;
         }
         else
         {
-            var r = new ImuReader(s => f.Report(s));
+            var r = new ImuReader(Report);
             r.Start();
             imu = r;
         }
+    }
+
+    /// <summary>Taps on the glasses (GlassesTaps), made while the switch is on; null while it is off.</summary>
+    private volatile GlassesTaps? taps;
+
+    private void SetTaps(bool on)
+    {
+        taps = on ? new GlassesTaps(n => ui.BeginInvoke(() => Tapped(n))) : null;
+        Log.P($"taps on the glasses: {(on ? "on (untested with real taps)" : "off")}");
+    }
+
+    /// <summary>Two taps recentre; three go to the next layout (the closest to the Steam Deck's "switch view": the
+    /// layout is the one view change every model has, and Ctrl+Alt+L does the same).</summary>
+    private void Tapped(int n)
+    {
+        if (quitting) return;
+        Log.P($"taps on the glasses: {n}, {(n == 2 ? "recentre" : "next layout")}");
+        if (n == 2) Recentre();
+        else if (n == 3) Adjust(SpaceAdjust.NextLayout);
     }
 
     private void StopTracking()
@@ -581,6 +607,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         }
         if (old.Shortcuts != now.Shortcuts) RegisterShortcuts();
         if (old.LaunchAtLogin != now.LaunchAtLogin) SignIn.Set(now.LaunchAtLogin);
+        if (old.Taps != now.Taps) SetTaps(now.Taps);
         if (old.PhoneStreamsPc != now.PhoneStreamsPc)
         {
             if (now.PhoneStreamsPc) StartPhone();

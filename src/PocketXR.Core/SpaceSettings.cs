@@ -368,6 +368,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     public double DisplayDelayMs = 8.0;
     /// <summary>Turning the head slides the row of screens (Smooth Follow and Steady mode).</summary>
     public bool HeadScroll = false;
+    /// <summary>Taps on the glasses (GlassesTaps): two recentre, three go to the next layout. Untested with real taps.</summary>
+    public bool Taps = false;
     /// <summary>The pointer jumps to the screen you look at when it is on another screen.</summary>
     public bool PointerFollowsHead = false;
 
@@ -570,6 +572,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         StillLock = other.StillLock;
         DisplayDelayMs = other.DisplayDelayMs;
         HeadScroll = other.HeadScroll;
+        Taps = other.Taps;
         PointerFollowsHead = other.PointerFollowsHead;
         SteadySixDof = other.SteadySixDof;
         SteadyOn = other.SteadyOn;
@@ -605,7 +608,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             && EdgeFade == other.EdgeFade && Brightness == other.Brightness && HeadTracking == other.HeadTracking
             && TrackingMode == other.TrackingMode && RecentreFollowsTilt == other.RecentreFollowsTilt
             && DrawSmoothing == other.DrawSmoothing && StillLock == other.StillLock
-            && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll
+            && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll && Taps == other.Taps
             && PointerFollowsHead == other.PointerFollowsHead && SteadySixDof == other.SteadySixDof && SteadyOn == other.SteadyOn
             && HidTracking == other.HidTracking && Shortcuts == other.Shortcuts && LaunchAtLogin == other.LaunchAtLogin
             && TourSeen == other.TourSeen && PanelAtStart == other.PanelAtStart
@@ -677,6 +680,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("stillLock", x => x.WriteBooleanValue(StillLock)),
             ("displayDelayMs", x => x.WriteNumberValue(DisplayDelayMs)),
             ("headScroll", x => x.WriteBooleanValue(HeadScroll)),
+            ("taps", x => x.WriteBooleanValue(Taps)),
             ("pointerFollowsHead", x => x.WriteBooleanValue(PointerFollowsHead)),
             ("steadySixDof", x => x.WriteBooleanValue(SteadySixDof)),
             ("steadyOn", x => x.WriteBooleanValue(SteadyOn)),
@@ -756,6 +760,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         if (SpaceSettingsJson.Has(c, "stillLock", out v)) s.StillLock = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "displayDelayMs", out v)) s.DisplayDelayMs = SpaceSettingsJson.Double(v);
         if (SpaceSettingsJson.Has(c, "headScroll", out v)) s.HeadScroll = SpaceSettingsJson.Bool(v);
+        if (SpaceSettingsJson.Has(c, "taps", out v)) s.Taps = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "pointerFollowsHead", out v)) s.PointerFollowsHead = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadySixDof", out v)) s.SteadySixDof = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadyOn", out v)) s.SteadyOn = SpaceSettingsJson.Bool(v);
