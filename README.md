@@ -76,7 +76,7 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - PC screens and the host use Moonlight's stream core, `native/moonlight` (moonlight-common-c, GPL-3.0), built into
   `moonlight-pxr.dll` with Zig's C compiler by `native/moonlight/build.ps1`.
 
-What is new in each version: [docs/release-notes-0.4.3.md](docs/release-notes-0.4.3.md) and the notes beside it.
+What is new in each version: [docs/release-notes-0.4.4.md](docs/release-notes-0.4.4.md) and the notes beside it.
 
 ## Build
 
