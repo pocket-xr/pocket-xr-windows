@@ -8,8 +8,10 @@ rules, no account and no paid tier.
 
 > **What has been tried.** Seen working on 17 November 2026 on a Steam Deck running Windows 11 with the XREAL Aura: floating
 > screens in the glasses, held still by head tracking, in 3D. On 18 November 2026 a tester reported the XREAL 1S working on
-> Windows 11 for hours, in normal and Steady mode. The XREAL XBX A01 and A01+ are recognised for head tracking since
-> 0.4.0, untested. Other glasses have not been tried yet.
+> Windows 11 for hours, in normal and Steady mode. On 23 November 2026 a tester's XREAL XBX A01+ streamed head tracking
+> on Windows (USB HID, after its control chip is woken; "your view moves"); its floating screens in the glasses are not
+> yet seen working (his copy was 0.4.1, from before its display was recognised in 0.4.2). The XBX A01 is untested.
+> Other glasses have not been tried yet.
 > See "Where it stands" below.
 
 ## How it is meant to work
@@ -76,7 +78,7 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - PC screens and the host use Moonlight's stream core, `native/moonlight` (moonlight-common-c, GPL-3.0), built into
   `moonlight-pxr.dll` with Zig's C compiler by `native/moonlight/build.ps1`.
 
-What is new in each version: [docs/release-notes-0.4.4.md](docs/release-notes-0.4.4.md) and the notes beside it.
+What is new in each version: [docs/release-notes-0.4.5.md](docs/release-notes-0.4.5.md) and the notes beside it.
 
 ## Build
 
@@ -122,8 +124,9 @@ glasses; and what is not written yet.
 ## Thanks
 
 - Pierre Zammit, for his XBX A01+ logs, which led to XBX A01 and A01+ support (0.4.0) and to waking their control chip
-  first (0.4.1), and to finding its display (0.4.2); and for his report of the control panel running off a second
-  screen (0.4.3).
+  first (0.4.1), and to finding its display (0.4.2); for his report of the control panel running off a second
+  screen (0.4.3); for asking for taps on the glasses (0.4.4); and for the logs that showed his head tracking working
+  and led to clearer logs (0.4.5).
 
 ## Licence
 

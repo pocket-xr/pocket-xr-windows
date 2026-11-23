@@ -261,6 +261,16 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         if (screen == null)
         {
             if (picture != null) Log.P("glasses display: gone");
+            // Glasses on USB with none of the PC's displays theirs: say what Windows has, once per change, so a log
+            // shows why nothing is drawn on them (a tester's XBX A01+ on 0.4.1, whose display name was not known).
+            string seen = glasses is Glasses on && !glassesMirrored
+                ? $"{on.Name} on USB, but none of the PC's displays is theirs: {string.Join("; ", all.Select(d => d.ToString()))}"
+                : "";
+            if (seen != lastNoDisplay)
+            {
+                lastNoDisplay = seen;
+                if (seen.Length > 0) Log.P($"glasses display: {seen}");
+            }
             picture?.Dispose();
             picture = null;
             glassesDisplay = null;
@@ -275,6 +285,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             return;
         }
         glassesGoneSince = null;
+        lastNoDisplay = "";
         framePeriod = 1.0 / Math.Max(screen.RefreshHz, 30);
         State.DisplayText = $"{screen.Width} x {screen.Height}, {Math.Round(screen.RefreshHz)} Hz";
         State.Stereo = GlassesOptics.IsSideBySide(screen.Width, screen.Height);
@@ -313,6 +324,11 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         {
             picture = new Render.GlassesPicture(screen, sources, Frame);
             picture.Lost += () => ui.BeginInvoke(ScreensChanged);
+            Log.P($"glasses picture: the Space is drawn on {screen.GdiName} at {screen.X},{screen.Y} " +
+                $"({screen.Width}x{screen.Height}, {Math.Round(screen.RefreshHz)} Hz), from {sources.Count} screen{(sources.Count == 1 ? "" : "s")}: " +
+                string.Join("; ", sources.Select(d => $"{d.GdiName} {d.Width}x{d.Height}")));
+            pictureLoggedAt = Now;
+            pictureRateLogged = false;
         }
         catch (Exception e)
         {
@@ -474,6 +490,12 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         if (n == 2) Recentre();
         else if (n == 3) Adjust(SpaceAdjust.NextLayout);
     }
+
+    /// <summary>The last "no display is theirs" line logged, so it is said once per change.</summary>
+    private string lastNoDisplay = "";
+    /// <summary>When the picture's line was last logged; whether its first frame rate has been.</summary>
+    private double? pictureLoggedAt;
+    private bool pictureRateLogged;
 
     private void StopTracking()
     {
@@ -808,6 +830,14 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     {
         if (quitting) return;
         ticks++;
+        // The Space's frame rate in the log once a minute while it is drawn (and at 10 s, to see it start).
+        if (picture != null && glassesDisplay is DisplayInfo gd && pictureLoggedAt is double at
+            && (Now - at > 60 || (Now - at > 10 && !pictureRateLogged)))
+        {
+            pictureRateLogged = true;
+            pictureLoggedAt = Now;
+            Log.P($"glasses picture: {Math.Round(State.Fps)} fps on {gd.GdiName}, {floating.Count} floating screens, tracking {(State.TrackingOn ? $"on, {State.ImuHz} reports a second" : "off")}");
+        }
         // Glasses plugged in or out: asked of Windows once a second (a display change is told at once).
         if (ticks % 4 == 0)
         {
