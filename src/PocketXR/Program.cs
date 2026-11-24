@@ -92,14 +92,11 @@ public static class Program
             }
         }
 
-        // One copy at a time: a second start brings the first one's control panel forward.
+        // One copy at a time, and the newest: a second start of the same copy brings its control panel forward; another
+        // version (or another file, or a copy from before this, which keeps no record) is asked to quit, and this one
+        // takes over (RunningCopy).
         using var once = new Mutex(true, "PocketXR.single", out bool first);
-        if (!first)
-        {
-            using var wake = EventWaitHandle.OpenExisting("PocketXR.show");
-            wake.Set();
-            return 0;
-        }
+        if (!first && !TakeOver(once)) return 0;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         Ui.Theme.InstallResources(app);
         int standInAt = Array.IndexOf(args, "--stand-in");
@@ -113,6 +110,59 @@ public static class Program
         app.Startup += (_, _) => controller.Start();
         app.Exit += (_, _) => controller.Dispose();
         return app.Run();
+    }
+
+    /// <summary>The running copy's record (RunningCopy), kept while Pocket XR runs.</summary>
+    public static string RunningFile => Path.Combine(Log.Shared.Folder, "running.txt");
+
+    /// <summary>
+    /// A second start: the same copy is brought forward (false: this one stops); another is asked to quit, and this one
+    /// waits for it (up to 45 s: it puts the glasses back first) and goes on (true). If it does not quit, says so.
+    /// </summary>
+    private static bool TakeOver(Mutex once)
+    {
+        string me = Environment.ProcessPath ?? "";
+        string myVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "dev";
+        string? text = null;
+        try { text = File.ReadAllText(RunningFile); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        var record = RunningCopy.Read(text);
+        bool alive = false;
+        if (record is var (_, _, pid))
+        {
+            try { using var p = System.Diagnostics.Process.GetProcessById(pid); alive = !p.HasExited; }
+            catch (ArgumentException) { }
+        }
+        if (RunningCopy.Decide(record, alive, myVersion, me) == RunningCopy.Choice.ShowRunning)
+        {
+            try
+            {
+                using var wake = EventWaitHandle.OpenExisting("PocketXR.show");
+                wake.Set();
+            }
+            catch (WaitHandleCannotBeOpenedException) { }
+            return false;
+        }
+        string running = RunningCopy.Describe(record, alive);
+        Log.P($"start: Pocket XR {running} is running; asking it to quit so this copy ({myVersion}, {me}) takes over");
+        try
+        {
+            using var quit = EventWaitHandle.OpenExisting("PocketXR.quit");
+            quit.Set();
+        }
+        catch (WaitHandleCannotBeOpenedException) { }
+        bool got;
+        try { got = once.WaitOne(TimeSpan.FromSeconds(45)); }
+        catch (AbandonedMutexException) { got = true; } // it ended without letting go: it is gone
+        if (got)
+        {
+            Log.P($"start: Pocket XR {running} quit; this copy carries on");
+            return true;
+        }
+        Log.P($"start: Pocket XR {running} did not quit within 45 s; this copy stops");
+        MessageBox.Show($"Pocket XR {running} is still running in the notification area, so this copy ({myVersion}) cannot start.\n\n" +
+            "Right-click Pocket XR's glasses icon by the clock, choose \"Quit and put the glasses back\", then open this copy again.",
+            "Pocket XR", MessageBoxButton.OK, MessageBoxImage.Information);
+        return false;
     }
 
     [DllImport("kernel32.dll")]

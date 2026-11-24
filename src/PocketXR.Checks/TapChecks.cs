@@ -80,6 +80,19 @@ public static class TapChecks
         var after = Run(3.5, tapsAt: new[] { 2.2, 2.4 }, skipFrom: 1.2, skipTo: 1.5);
         Check.That(after.Count == 1 && after[0] == 2, $"and later ones count again {Show(after)}");
 
+        // A second start (RunningCopy): the same copy is shown; another version, another file or an older copy that
+        // keeps no record is asked to quit (a tester's 0.4.1 kept running after he installed 0.4.5 and 0.4.7).
+        string rec = RunningCopy.Text("0.4.8", @"C:\PXR\PocketXR.exe", 1234);
+        Check.That(RunningCopy.Read(rec) == ("0.4.8", @"C:\PXR\PocketXR.exe", 1234), "the running copy's record reads back");
+        Check.That(RunningCopy.Read(null) == null && RunningCopy.Read("") == null && RunningCopy.Read("0.4.8\n") == null, "no record, or a broken one, reads as none");
+        var r = RunningCopy.Read(rec);
+        Check.That(RunningCopy.Decide(r, true, "0.4.8", @"c:\pxr\pocketxr.exe") == RunningCopy.Choice.ShowRunning, "the same copy: shown, as before");
+        Check.That(RunningCopy.Decide(r, true, "0.4.9", @"C:\PXR\PocketXR.exe") == RunningCopy.Choice.Replace, "another version: replaced");
+        Check.That(RunningCopy.Decide(r, true, "0.4.8", @"D:\New\PocketXR.exe") == RunningCopy.Choice.Replace, "another file: replaced");
+        Check.That(RunningCopy.Decide(null, false, "0.4.8", @"C:\PXR\PocketXR.exe") == RunningCopy.Choice.Replace, "an older copy with no record: replaced");
+        Check.That(RunningCopy.Decide(r, false, "0.4.8", @"C:\PXR\PocketXR.exe") == RunningCopy.Choice.Replace, "a record left by a copy no longer running: not trusted");
+        Check.That(RunningCopy.Describe(null, false) == "an older version" && RunningCopy.Describe(r, true) == "0.4.8", "what it is called in messages");
+
         Check.That(!new SpaceSettings().Taps, "taps are off by default");
         var on = new SpaceSettings { Taps = true };
         Check.That(SpaceSettings.Decode(on.Encode()).Taps, "the switch is saved");

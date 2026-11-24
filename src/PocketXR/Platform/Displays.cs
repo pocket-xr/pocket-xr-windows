@@ -96,6 +96,16 @@ public static class Displays
     /// Windows, so a window over them would cover that screen too. Seen on the Steam Deck, 17 Nov 2026: the Aura came
     /// up mirroring the Deck's own screen.
     /// </summary>
+    /// <summary>Why [d] is or is not taken as the glasses' display, for logs and the glasses report.</summary>
+    public static string Why(DisplayInfo d, List<DisplayInfo> all)
+    {
+        if (!Core.Glasses.IsGlassesScreenName(d.Name))
+            return d.Name.Length == 0 ? "no name from the display, so not the glasses" : "not a glasses name";
+        if (IsVirtual(d)) return "a virtual display, not the glasses";
+        if (Mirrored(all, d)) return "a copy of another screen (Windows is duplicating)";
+        return "the glasses' display";
+    }
+
     public static bool GlassesMirrored(List<DisplayInfo> all) =>
         all.Exists(d => Core.Glasses.IsGlassesScreenName(d.Name) && !IsVirtual(d) && Mirrored(all, d));
 

@@ -111,7 +111,14 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
 
     public void Start()
     {
-        Log.P($"Pocket XR for Windows {State.Version} starting, {RuntimeInformation.OSDescription}");
+        Log.P($"Pocket XR for Windows {State.Version} starting, {RuntimeInformation.OSDescription}, from {Environment.ProcessPath}");
+        // This copy's record, so a later start of another version can ask it to quit (RunningCopy).
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Program.RunningFile)!);
+            File.WriteAllText(Program.RunningFile, RunningCopy.Text(State.Version, Environment.ProcessPath ?? "", Environment.ProcessId));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Log.P($"start: running record: {e.Message}"); }
         ShortcutChoices.Load();
         messages = new MessageWindow();
         int size = MessageWindow.SmallIconSize;
@@ -264,8 +271,11 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             // Glasses on USB with none of the PC's displays theirs: say what Windows has, once per change, so a log
             // shows why nothing is drawn on them (a tester's XBX A01+ on 0.4.1, whose display name was not known).
             string seen = glasses is Glasses on && !glassesMirrored
-                ? $"{on.Name} on USB, but none of the PC's displays is theirs: {string.Join("; ", all.Select(d => d.ToString()))}"
+                ? $"{on.Name} on USB, but none of the PC's displays is theirs: {string.Join("; ", all.Select(d => $"{d} ({Displays.Why(d, all)})"))}"
                 : "";
+            State.DisplayWhy = glasses != null && !glassesMirrored
+                ? (all.Count == 0 ? "Windows lists no displays." : "None of Windows' displays is the glasses': " + string.Join("; ", all.Select(d => $"{(d.Name.Length > 0 ? d.Name : d.GdiName)}, {Displays.Why(d, all)}")))
+                : null;
             if (seen != lastNoDisplay)
             {
                 lastNoDisplay = seen;
@@ -286,6 +296,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         }
         glassesGoneSince = null;
         lastNoDisplay = "";
+        State.DisplayWhy = null;
         framePeriod = 1.0 / Math.Max(screen.RefreshHz, 30);
         State.DisplayText = $"{screen.Width} x {screen.Height}, {Math.Round(screen.RefreshHz)} Hz";
         State.Stereo = GlassesOptics.IsSideBySide(screen.Width, screen.Height);
@@ -1297,7 +1308,8 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     public void SaveGlassesReport()
     {
         List<UsbDeviceInfo> usb = UsbDevices.List();
-        List<string> shown = Displays.List().Select(d => $"{(d.Name.Length > 0 ? d.Name : d.GdiName)}: {d.Width} x {d.Height}, {Math.Round(d.RefreshHz)} Hz").ToList();
+        List<DisplayInfo> listed = Displays.List();
+        List<string> shown = listed.Select(d => $"{(d.Name.Length > 0 ? d.Name : d.GdiName)}: {d.Width} x {d.Height}, {Math.Round(d.RefreshHz)} Hz ({Displays.Why(d, listed)})").ToList();
         string tracking = $"{State.ImuHz} reports a second via {imu?.ConnectedVia ?? hidImu?.ConnectedVia ?? "nothing"}, bias {(State.BiasReady ? "learnt" : "learning")}";
         // USB HID glasses: whether the switch is on, and what the reader is doing (an XBX report could not tell).
         if (glasses is Glasses gh && gh.HidImu && !gh.NetworkImu)
@@ -1583,6 +1595,13 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         messages?.Dispose();
         showSignal?.Dispose();
         quitSignal?.Dispose();
+        // This copy's record goes with it (only if it is still this copy's).
+        try
+        {
+            if (RunningCopy.Read(File.ReadAllText(Program.RunningFile)) is var (_, _, pid) && pid == Environment.ProcessId)
+                File.Delete(Program.RunningFile);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         Stopping(phoneHost, phoneLink, soundKeeper);
     }
 
