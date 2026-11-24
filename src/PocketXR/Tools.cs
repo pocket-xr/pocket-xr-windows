@@ -176,9 +176,9 @@ public static class Tools
     /// Readability can do with this PC's driver: the sizes it offers, and Windows' scale set to 125 and 150 percent and
     /// read back. Then it is removed. Changes nothing else.
     /// </summary>
-    public static int ScreenLookTest()
+    public static int ScreenLookTest(int width = 1920, int height = 1080)
     {
-        using VirtualDisplays? made = VirtualDisplays.Make(1, 1920, 1080, 60, out string why, idOffset: 0x70);
+        using VirtualDisplays? made = VirtualDisplays.Make(1, width, height, 60, out string why, idOffset: 0x70);
         if (made == null)
         {
             Console.WriteLine($"No virtual display: {why}.");
@@ -196,6 +196,15 @@ public static class Tools
             return 1;
         }
         Console.WriteLine($"Made: {d}");
+        if (d.Width != width || d.Height != height)
+        {
+            int r = Displays.SetMode(d.GdiName, width, height, 60);
+            System.Threading.Thread.Sleep(300);
+            d = VirtualDisplays.Find(made.Screens[0], Displays.List()) ?? d;
+            Console.WriteLine($"Set to {width}x{height}: {(r == 0 ? "done" : $"refused ({r})")}; now {d.Width}x{d.Height}");
+            var pick = ScreenLook.Offered(width, height, Displays.Modes(d.GdiName));
+            Console.WriteLine($"The host would use: {(pick is var (pw, ph) ? $"{pw}x{ph}" : "the size it has")}");
+        }
         var modes = Displays.Modes(d.GdiName);
         Console.WriteLine($"Sizes it offers ({modes.Count}): {string.Join(", ", modes.Select(m => $"{m.Width}x{m.Height}"))}");
         foreach (var size in ScreenLook.ReadabilitySizes)

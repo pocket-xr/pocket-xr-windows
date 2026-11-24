@@ -87,6 +87,20 @@ public static class ReadabilityChecks
         Check.That(ScreenLook.HostSize(1784, 976, true) == (1338, 732), "with Readability, three quarters of it");
         Check.That(ScreenLook.HostSize(1920, 1080, true) == (1440, 810), "1920 x 1080 becomes 1440 x 810");
 
+        // A phone asks for 1920 x 1080, 1920 x 1200 or 2560 x 1600 (Android 1.6.14's Screen size), or its window's shape.
+        // SudoVDA offers the size a display is made at (measured: 1920 x 1200 and 2560 x 1600 both set); Parsec's driver
+        // has a fixed list (its documented defaults, below): an unoffered size takes the nearest of the same shape.
+        var parsec = new[] { (3840, 2160), (2560, 1600), (2560, 1440), (1920, 1200), (1920, 1080), (1600, 900), (1440, 900), (1280, 800), (1280, 720) };
+        Check.That(ScreenLook.Offered(1920, 1200, parsec) == (1920, 1200), "1920 x 1200 offered: used");
+        Check.That(ScreenLook.Offered(2560, 1600, parsec) == (2560, 1600), "2560 x 1600 offered: used");
+        var noWide = new[] { (2560, 1600), (1920, 1080), (1440, 900), (1280, 720) };
+        Check.That(ScreenLook.Offered(1920, 1200, noWide) == (1440, 900), "1920 x 1200 not offered: the nearest 16:10 one");
+        Check.That(ScreenLook.Offered(2048, 1280, noWide) == (2560, 1600) || ScreenLook.Offered(2048, 1280, noWide) == (1440, 900),
+                   "another 16:10 size: a 16:10 one");
+        Check.That(ScreenLook.Offered(1784, 976, parsec) == null, "a phone window's own shape with nothing of that shape: keep what it has");
+        Check.That(ScreenLook.Offered(1920, 1200, new[] { (1920, 1080), (1280, 720) }) == null, "never a size of another shape");
+        Check.That(ScreenLook.Offered(1920, 1200, System.Array.Empty<(int, int)>()) == null, "no list: keep what it has");
+
         // Windows kept on their screen (the control panel on a 1080p screen at 125 %, its taskbar 60 px: Pierre Zammit's
         // "Second screen only" case, 22 Nov 2026).
         Check.That(Math.Abs(WindowFit.MaxHeight(0, 1020, 1.25) - (816 - 12)) < 0.01, "the control panel's height is held to its own screen at its scale");

@@ -85,6 +85,23 @@ public static class ScreenLook
     /// <summary>Readability's sizes to try, best first: 1440 x 810, then 16:9 sizes Parsec's driver offers.</summary>
     public static readonly (int Width, int Height)[] ReadabilitySizes = { (1440, 810), (1600, 900), (1280, 720) };
 
+    /// <summary>
+    /// The size to use for a screen wanted at [width] x [height] from the sizes its driver [offered]: that size if
+    /// offered, else the nearest offered one of the same shape (within 1%, closest in area), else null (keep what it
+    /// has; the stream is scaled to the size asked). A phone asks for 1920 x 1080, 1920 x 1200 or 2560 x 1600 (Pocket
+    /// XR for Android 1.6.14's Screen size) as well as its own window's shape.
+    /// </summary>
+    public static (int Width, int Height)? Offered(int width, int height, IEnumerable<(int Width, int Height)> offered)
+    {
+        var list = offered.ToList();
+        if (list.Contains((width, height))) return (width, height);
+        double shape = (double)width / Math.Max(1, height);
+        long area = (long)width * height;
+        var same = list.Where(o => o.Height > 0 && Math.Abs((double)o.Width / o.Height - shape) / shape < 0.01)
+            .OrderBy(o => Math.Abs((long)o.Width * o.Height - area)).ThenByDescending(o => o.Width).ToList();
+        return same.Count > 0 ? same[0] : null;
+    }
+
     /// <summary>"Standard", "125%", "150%".</summary>
     public static string Title(int scale) => scale == 100 ? "Standard" : $"{scale}%";
 

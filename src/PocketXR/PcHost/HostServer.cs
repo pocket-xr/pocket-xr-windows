@@ -426,6 +426,25 @@ internal sealed class HostServer : IDisposable
                         Thread.Sleep(100);
                     }
                     Log.P($"host: virtual display came at {first.Width}x{first.Height}: set to {w}x{h} ({(r == 0 ? "done" : $"refused, {r}")})");
+                    // Not that size: the driver may not offer it (Parsec's list is fixed). The nearest offered size of
+                    // the same shape, else what it has; the stream is scaled to the size the phone asked either way.
+                    if (d.Width != w || d.Height != h)
+                    {
+                        var offered = Platform.Displays.Modes(d.GdiName);
+                        var pick = ScreenLook.Offered(w, h, offered);
+                        if (pick is var (pw, ph) && (pw != d.Width || ph != d.Height))
+                        {
+                            int r2 = Platform.Displays.SetMode(d.GdiName, pw, ph, Math.Max(30, s.Fps));
+                            Thread.Sleep(300);
+                            d = Platform.VirtualDisplays.Find(made.Screens[0], Platform.Displays.List()) ?? d;
+                            Log.P($"host: {w}x{h} not offered by the driver; the nearest of the same shape, {pw}x{ph}: {(r2 == 0 ? "set" : $"refused, {r2}")}, the display is {d.Width}x{d.Height}");
+                        }
+                        else
+                        {
+                            Log.P($"host: {w}x{h} not offered by the driver and no size of the same shape is; the display stays {d.Width}x{d.Height}, scaled to {s.Width}x{s.Height} for the stream " +
+                                $"(it offers {string.Join(", ", offered.Take(12).Select(o => $"{o.Width}x{o.Height}"))})");
+                        }
+                    }
                 }
                 int? scaled = Platform.Displays.SetScale(d.GdiName, scale);
                 s.ScreenName = d.GdiName;
