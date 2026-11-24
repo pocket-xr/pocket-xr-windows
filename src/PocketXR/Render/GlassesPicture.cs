@@ -23,6 +23,15 @@ public sealed class GlassesPicture : IDisposable
     /// <summary>The glasses' display or the graphics card went away; the app looks at the displays again.</summary>
     public event Action? Lost;
 
+    /// <summary>
+    /// A floating screen's picture is another shape than it was laid out with (Windows turned it, or changed its size,
+    /// and the layout has not caught up): the app reads the displays again. Raised on the drawing thread, once a change.
+    /// </summary>
+    public event Action? ShapeChanged;
+
+    /// <summary>The last picture size (as on the desktop) told for each screen, so each change is told once.</summary>
+    private (int Width, int Height)?[] told = Array.Empty<(int, int)?>();
+
     /// <summary>Frames drawn on the glasses a second.</summary>
     public double Fps => window.Fps;
 
@@ -71,6 +80,26 @@ public sealed class GlassesPicture : IDisposable
     private FrameInput Frame()
     {
         (Quat head, PanelPlacement[] panels, RenderOptions options) = frame();
+        // Each panel the shape of the picture Windows gives now, not the shape it was laid out with: the layout
+        // follows when the app hears of the change, and until then the picture is never squeezed into the old shape.
+        var shown = new (int Width, int Height)?[panels.Length];
+        for (int i = 0; i < panels.Length && i < captures.Count; i++) shown[i] = captures[i].Texture != null ? captures[i].ShownSize : null;
+        panels = ScreenShape.Follow(panels, shown, out bool[] changed);
+        if (told.Length != panels.Length) told = new (int, int)?[panels.Length];
+        bool tell = false;
+        for (int i = 0; i < panels.Length; i++)
+        {
+            if (!changed[i])
+            {
+                told[i] = null;
+                continue;
+            }
+            if (told[i] == shown[i]) continue;
+            told[i] = shown[i];
+            tell = true;
+            Log.P($"glasses picture: screen {i + 1} is {shown[i]!.Value.Width}x{shown[i]!.Value.Height} in Windows now, not the shape it was laid out with; drawn as Windows has it, and the layout read again");
+        }
+        if (tell) ShapeChanged?.Invoke();
         var paired = new (PanelPlacement Placement, ID3D11ShaderResourceView? Texture)[panels.Length];
         var turns = new int[panels.Length];
         for (int i = 0; i < panels.Length && i < captures.Count; i++) turns[i] = captures[i].Rotation;

@@ -38,7 +38,11 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
   Asked for by Pierre Zammit.
 - **Portrait screens** (Settings, Space): any floating screen turned on its side, 1080 x 1920, for code or long pages;
   Windows turns it, so apps lay out tall. Tried on a PC with Apollo's driver (turned and back, the capture's turn
-  undone as for the Steam Deck's own panel); not yet in glasses or with Parsec's driver.
+  undone as for the Steam Deck's own panel); not yet in glasses or with Parsec's driver. Since 0.4.10 each screen is
+  drawn the shape Windows has it, also after a change in Windows' own Display settings (checked by sums).
+- **Main display** (Settings, Space: This PC, Screen 1, 2 or 3): which screen is Windows' main display, where the
+  taskbar and new windows go; one chosen in Windows' own Settings shows there too. Checked by sums; not yet on a real
+  desktop or with glasses.
 - **This PC's screen** (Settings, Space: Left, Below, Right, Above): where your PC's own screen sits next to the
   floating screens on the desktop, for the pointer. Below suits a laptop under the glasses' screens. Checked by sums;
   not yet with glasses.
@@ -94,7 +98,7 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - PC screens and the host use Moonlight's stream core, `native/moonlight` (moonlight-common-c, GPL-3.0), built into
   `moonlight-pxr.dll` with Zig's C compiler by `native/moonlight/build.ps1`.
 
-What is new in each version: [docs/release-notes-0.4.9.md](docs/release-notes-0.4.9.md) and the notes beside it.
+What is new in each version: [docs/release-notes-0.4.10.md](docs/release-notes-0.4.10.md) and the notes beside it.
 
 ## Build
 
@@ -143,7 +147,8 @@ glasses; and what is not written yet.
   first (0.4.1), and to finding its display (0.4.2); for his report of the control panel running off a second
   screen (0.4.3); for asking for taps on the glasses (0.4.4); and for the logs that showed his head tracking working
   and led to clearer logs (0.4.5); for finding that a new copy did not replace a running one (0.4.8); and for his list
-  behind 0.4.9 (softer taps, the glasses' buttons, depth in 2D, this PC's side, snipping, portrait screens).
+  behind 0.4.9 (softer taps, the glasses' buttons, depth in 2D, this PC's side, snipping, portrait screens); and for
+  finding portrait screens drawn the wrong shape and asking to choose the main display (0.4.10).
 
 ## Licence
 

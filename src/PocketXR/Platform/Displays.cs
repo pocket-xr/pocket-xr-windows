@@ -150,13 +150,54 @@ public static class Displays
         return places;
     }
 
-    public static bool Arrange(DisplayInfo own, DisplayInfo? glasses, IReadOnlyList<DisplayInfo> floating, IReadOnlyList<(int X, int Y)> origins, PcSide side = PcSide.Left)
+    /// <summary>
+    /// Every display in [all], at its place in [moves] or where it is now, all moved together so [mainGdi] (Windows'
+    /// main display) stays at 0,0: Windows makes main whichever display is there, and refuses a set with none there
+    /// (error 87, seen in a tester's log on 0.4.9 after he made a floating screen main in Windows' Settings).
+    /// </summary>
+    public static List<(DisplayInfo Display, int X, int Y)> WithMain(List<DisplayInfo> all,
+        IReadOnlyList<(DisplayInfo Display, int X, int Y)> moves, string? mainGdi)
     {
-        var places = Places(own, glasses, floating, origins, side);
+        var list = new List<(DisplayInfo Display, int X, int Y)>();
+        foreach (DisplayInfo d in all)
+        {
+            int at = -1;
+            for (int i = 0; i < moves.Count && at < 0; i++)
+                if (string.Equals(moves[i].Display.GdiName, d.GdiName, StringComparison.OrdinalIgnoreCase)) at = i;
+            list.Add(at >= 0 ? (d, moves[at].X, moves[at].Y) : (d, d.X, d.Y));
+        }
+        int main = mainGdi == null ? -1 : list.FindIndex(p => string.Equals(p.Display.GdiName, mainGdi, StringComparison.OrdinalIgnoreCase));
+        (int X, int Y)[] shifted = MainDisplay.AtOrigin(list.Select(p => (p.X, p.Y)).ToList(), main);
+        return list.Select((p, i) => (p.Display, shifted[i].X, shifted[i].Y)).ToList();
+    }
+
+    /// <summary>Windows' main display now (the one at 0,0), or null.</summary>
+    public static DisplayInfo? MainOf(List<DisplayInfo> all) => all.Find(d => d.Primary);
+
+    /// <summary>
+    /// Places the floating screens and the glasses' display (Places), keeping whichever display is Windows' main one
+    /// now at 0,0 (WithMain), so a main display chosen in Windows' Settings stays main. True when done or already so.
+    /// </summary>
+    public static bool Arrange(List<DisplayInfo> all, DisplayInfo own, DisplayInfo? glasses, IReadOnlyList<DisplayInfo> floating, IReadOnlyList<(int X, int Y)> origins, PcSide side = PcSide.Left)
+    {
+        var places = WithMain(all, Places(own, glasses, floating, origins, side), MainOf(all)?.GdiName);
         if (places.TrueForAll(p => p.Display.X == p.X && p.Display.Y == p.Y)) return true;
         bool ok = MoveDisplays(places);
         Log.P($"displays: floating screens placed with this PC's screen {side.Title().ToLowerInvariant()} of them, the glasses' display out of their way: {(ok ? "done" : "not done")}");
         return ok;
+    }
+
+    /// <summary>
+    /// Makes [gdiName] Windows' main display (the taskbar's and new windows' home), as "Make this my main display" in
+    /// Windows' Settings does: every display moves by the same amount so it is at 0,0, and they stay joined as they
+    /// were. Through SetDisplayConfig, as MoveDisplays. True when Windows took it, or it was already main.
+    /// </summary>
+    public static bool MakeMain(string gdiName)
+    {
+        List<DisplayInfo> all = List();
+        if (MainOf(all) is DisplayInfo now && string.Equals(now.GdiName, gdiName, StringComparison.OrdinalIgnoreCase)) return true;
+        if (!all.Exists(d => string.Equals(d.GdiName, gdiName, StringComparison.OrdinalIgnoreCase))) return false;
+        return MoveDisplays(WithMain(all, Array.Empty<(DisplayInfo, int, int)>(), gdiName));
     }
 
     /// <summary>
@@ -185,7 +226,7 @@ public static class Displays
             uint sourceMode = BitConverter.ToUInt32(path[12..16]);
             if (sourceMode >= modeCount) continue;
             string gdi = DeviceString(GetSourceName, 84, sourceAdapter, sourceId, 20, 32);
-            int at = places.FindIndex(p => p.Display.GdiName == gdi);
+            int at = places.FindIndex(p => string.Equals(p.Display.GdiName, gdi, StringComparison.OrdinalIgnoreCase));
             if (at < 0) continue;
             int offset = (int)sourceMode * ModeSize;
             if (BitConverter.ToUInt32(modes, offset) != ModeInfoSource) continue;

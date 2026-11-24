@@ -381,6 +381,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     /// <summary>Where this PC's own screen sits next to the floating screens on the desktop: Left (as before), Below
     /// (a laptop under the glasses' screens), Right or Above.</summary>
     public PcSide PcSide = PcSide.Left;
+    /// <summary>Windows' main display (MainDisplay): 0 this PC's screen, 1 to 3 that floating screen.</summary>
+    public int MainScreen = MainDisplay.ThisPc;
 
     /// <summary>Whether floating screen [index] (from 0) is turned to portrait.</summary>
     public bool IsPortrait(int index) => index is >= 0 and < 3 && (PortraitScreens & (1 << index)) != 0;
@@ -477,6 +479,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             s.TextScale = ScreenLook.Nearest(s.TextScale);
             s.TapSensitivity = Math.Clamp(s.TapSensitivity, GlassesTaps.SensitivityMin, GlassesTaps.SensitivityMax);
             s.PortraitScreens &= 0b111;
+            s.MainScreen = Math.Clamp(s.MainScreen, MainDisplay.ThisPc, MainDisplay.Max);
             s.IpdMm = Held(s.IpdMm, IpdRange);
             s.Glow = Held(s.Glow, (0, 1));
             s.Brightness = Held(s.Brightness, BrightnessRange);
@@ -601,6 +604,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         TapSensitivity = other.TapSensitivity;
         PortraitScreens = other.PortraitScreens;
         PcSide = other.PcSide;
+        MainScreen = other.MainScreen;
         PointerFollowsHead = other.PointerFollowsHead;
         SteadySixDof = other.SteadySixDof;
         SteadyOn = other.SteadyOn;
@@ -636,7 +640,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             && EdgeFade == other.EdgeFade && Brightness == other.Brightness && HeadTracking == other.HeadTracking
             && TrackingMode == other.TrackingMode && RecentreFollowsTilt == other.RecentreFollowsTilt
             && DrawSmoothing == other.DrawSmoothing && StillLock == other.StillLock
-            && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll && Taps == other.Taps && TapSensitivity == other.TapSensitivity && PortraitScreens == other.PortraitScreens && PcSide == other.PcSide
+            && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll && Taps == other.Taps && TapSensitivity == other.TapSensitivity && PortraitScreens == other.PortraitScreens && PcSide == other.PcSide && MainScreen == other.MainScreen
             && PointerFollowsHead == other.PointerFollowsHead && SteadySixDof == other.SteadySixDof && SteadyOn == other.SteadyOn
             && HidTracking == other.HidTracking && Shortcuts == other.Shortcuts && LaunchAtLogin == other.LaunchAtLogin
             && TourSeen == other.TourSeen && PanelAtStart == other.PanelAtStart
@@ -713,6 +717,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("tapSensitivity", x => x.WriteNumberValue(TapSensitivity)),
             ("portraitScreens", x => x.WriteNumberValue(PortraitScreens)),
             ("pcSide", x => x.WriteStringValue(PcSide.Raw())),
+            ("mainScreen", x => x.WriteNumberValue(MainScreen)),
             ("pointerFollowsHead", x => x.WriteBooleanValue(PointerFollowsHead)),
             ("steadySixDof", x => x.WriteBooleanValue(SteadySixDof)),
             ("steadyOn", x => x.WriteBooleanValue(SteadyOn)),
@@ -797,6 +802,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         if (SpaceSettingsJson.Has(c, "tapSensitivity", out v)) s.TapSensitivity = SpaceSettingsJson.Int(v);
         if (SpaceSettingsJson.Has(c, "portraitScreens", out v)) s.PortraitScreens = SpaceSettingsJson.Int(v);
         if (SpaceSettingsJson.Has(c, "pcSide", out v)) s.PcSide = PcSideExt.FromRaw(SpaceSettingsJson.String(v));
+        if (SpaceSettingsJson.Has(c, "mainScreen", out v)) s.MainScreen = SpaceSettingsJson.Int(v);
         if (SpaceSettingsJson.Has(c, "pointerFollowsHead", out v)) s.PointerFollowsHead = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadySixDof", out v)) s.SteadySixDof = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadyOn", out v)) s.SteadyOn = SpaceSettingsJson.Bool(v);
