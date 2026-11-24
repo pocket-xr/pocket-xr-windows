@@ -302,8 +302,23 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         State.Stereo = GlassesOptics.IsSideBySide(screen.Width, screen.Height);
         if (picture != null && glassesDisplay != null && glassesDisplay == screen)
         {
+            string before = FloatingShapes();
             RefreshFloating(all);
-            if (!FloatingLost()) return;
+            if (!FloatingLost())
+            {
+                // A floating screen turned, or another size, while the glasses' display stayed put (Portrait turned
+                // off, or a change in Windows' Settings): the Space is laid out again from what Windows has now. Before
+                // 0.4.10 only a move of the glasses' display did this, so a tester's screen stayed tall after Portrait
+                // was turned off, and wide when it was turned on again (Pierre Zammit, 0.4.9).
+                string after = FloatingShapes();
+                if (after != before)
+                {
+                    Log.P($"floating screens: Windows has them {after} now (they were {before}); the Space follows");
+                    Recompute();
+                    ArrangeSoon();
+                }
+                return;
+            }
             // Floating screens went while the glasses stayed (their driver took them away): they are made again,
             // and the picture with them.
             picture.Dispose();
@@ -335,6 +350,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         {
             picture = new Render.GlassesPicture(screen, sources, Frame);
             picture.Lost += () => ui.BeginInvoke(ScreensChanged);
+            picture.ShapeChanged += () => ui.BeginInvoke(ScreensChanged);
             Log.P($"glasses picture: the Space is drawn on {screen.GdiName} at {screen.X},{screen.Y} " +
                 $"({screen.Width}x{screen.Height}, {Math.Round(screen.RefreshHz)} Hz), from {sources.Count} screen{(sources.Count == 1 ? "" : "s")}: " +
                 string.Join("; ", sources.Select(d => $"{d.GdiName} {d.Width}x{d.Height}")));
@@ -355,6 +371,9 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         if (standIn == null) return null;
         return all.Find(d => d.GdiName.EndsWith("DISPLAY" + standIn, StringComparison.OrdinalIgnoreCase) && !d.Primary);
     }
+
+    /// <summary>The floating screens' names and sizes as last read, for telling a change.</summary>
+    private string FloatingShapes() => floating.Count == 0 ? "none" : string.Join(", ", floating.Select(d => $"{d.GdiName} {d.Width}x{d.Height}"));
 
     /// <summary>Which of Windows' displays are Pocket XR's floating screens now, in their own order.</summary>
     private void RefreshFloating(List<DisplayInfo> all)
@@ -627,6 +646,8 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         ApplyPortrait();
         Log.P($"virtual displays: {floating.Count} of {wanted} are on the desktop, " +
             string.Join(", ", floating.Select(d => $"{d.GdiName} {d.Width}x{d.Height} at {Displays.Scale(d.GdiName)?.Percent.ToString() ?? "?"}%")));
+        // New floating screens are never main by themselves: the one chosen in Settings is made so.
+        ApplyMain("the floating screens were made");
     }
 
     /// <summary>Whether the floating screens were made for Readability (its sizes) or not (1920 x 1080).</summary>
@@ -641,17 +662,72 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     /// Windows turns the display (its Orientation setting); the Space then shows it as tall as it is, and the capture's
     /// quarter turn is undone as for the Steam Deck's own turned panel. Logged when it changes.
     /// </summary>
-    private void ApplyPortrait()
+    private bool ApplyPortrait()
     {
+        bool turned = false;
         for (int i = 0; i < floating.Count; i++)
         {
             DisplayInfo d = floating[i];
             bool want = Store.S.IsPortrait(i);
             if (Displays.IsPortrait(d.GdiName) == want) continue;
             int r = Displays.SetPortrait(d.GdiName, want);
+            turned |= r == 0;
             Log.P($"floating screen {i + 1}: {d.GdiName} {(want ? "turned to portrait" : "upright again")}: {(r == 0 ? "done" : $"refused, {r}")}");
         }
+        return turned;
     }
+
+    /// <summary>When Pocket XR last asked Windows for another main display: Windows' answer is not read back as the
+    /// user's own choice for a few seconds after.</summary>
+    private double mainAskedAt = double.NegativeInfinity;
+
+    /// <summary>
+    /// Makes the display chosen in Settings (MainDisplay: this PC's screen or a floating screen) Windows' main one, if
+    /// it is not already. A floating screen that is not there (fewer screens now) leaves this PC's screen main.
+    /// </summary>
+    private void ApplyMain(string why)
+    {
+        if (standIn != null) return;
+        List<DisplayInfo> all = Displays.List();
+        RefreshFloating(all);
+        if (Displays.Own(all) is not DisplayInfo own) return;
+        int choice = Store.S.MainScreen;
+        int index = MainDisplay.FloatingIndex(choice, floating.Count);
+        DisplayInfo target = index >= 0 ? floating[index] : own;
+        string what = index >= 0 ? MainDisplay.Title(index + 1) : MainDisplay.Title(MainDisplay.ThisPc)
+            + (choice != MainDisplay.ThisPc ? $" (floating screen {choice} is not there)" : "");
+        DisplayInfo? now = Displays.MainOf(all);
+        if (now != null && string.Equals(now.GdiName, target.GdiName, StringComparison.OrdinalIgnoreCase))
+        {
+            if (why == ChosenInSettings) Log.P($"main display: {what}, {target.GdiName}: it is already");
+            return;
+        }
+        mainAskedAt = Now;
+        bool ok = Displays.MakeMain(target.GdiName);
+        Log.P($"main display: {what}, {target.GdiName}, {why} (was {now?.GdiName ?? "none"}): {(ok ? "done" : "not done")}");
+    }
+
+    private const string ChosenInSettings = "chosen in Settings";
+
+    /// <summary>
+    /// Settings show the main display Windows has: one chosen in Windows' own Settings is taken as the choice, rather
+    /// than changed back. Only once the displays have been quiet, and not just after Pocket XR asked for one.
+    /// </summary>
+    private void ReadMainFromWindows()
+    {
+        if (standIn != null || picture == null || displays == null || floating.Count == 0 || floating.Count < displays.Screens.Count) return;
+        if (!DisplaysQuiet || Now - mainAskedAt < 6) return;
+        List<DisplayInfo> all = Displays.List();
+        int mainFloating = floating.FindIndex(f => all.Exists(d => d.Primary && string.Equals(d.GdiName, f.GdiName, StringComparison.OrdinalIgnoreCase)));
+        bool ownMain = Displays.Own(all)?.Primary ?? false;
+        if (MainDisplay.ChoiceNow(mainFloating, ownMain) is not int choice || choice == Store.S.MainScreen) return;
+        Log.P($"main display: Windows has {MainDisplay.Title(choice)} as main now (chosen outside Pocket XR); Settings show it");
+        mainReadBack = choice;
+        Store.Update(s => s.MainScreen = choice);
+    }
+
+    /// <summary>A choice read back from Windows (ReadMainFromWindows): Windows has it already, so it is not asked for.</summary>
+    private int? mainReadBack;
 
     private void ApplyTextSize()
     {
@@ -721,7 +797,24 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         if (old.PortraitScreens != now.PortraitScreens)
         {
             Log.P($"portrait screens: {string.Join(", ", Enumerable.Range(0, 3).Where(now.IsPortrait).Select(i => i + 1).DefaultIfEmpty(0).Select(n => n == 0 ? "none" : n.ToString()))}");
-            ApplyPortrait();
+            if (ApplyPortrait())
+            {
+                // The turned screens read back now, not only when Windows says the displays changed: the Space is laid
+                // out with their new shape, and the floating screens placed again for it.
+                RefreshFloating(Displays.List());
+                Recompute();
+                ArrangeSoon();
+            }
+        }
+        if (old.MainScreen != now.MainScreen)
+        {
+            if (mainReadBack == now.MainScreen) mainReadBack = null;
+            else
+            {
+                mainReadBack = null;
+                Log.P($"main display: {MainDisplay.Title(now.MainScreen)}");
+                ApplyMain(ChosenInSettings);
+            }
         }
         if (old.TapSensitivity != now.TapSensitivity && taps is GlassesTaps tp)
         {
@@ -784,8 +877,9 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         (int X, int Y)[] origins = DisplayGrid.Origins(State.Steady ? Array.Empty<PanelPlacement>() : panels, sizes);
         DisplayInfo? glasses = Displays.Glasses(all);
         PcSide side = Store.S.PcSide;
-        if (Displays.Places(own, glasses, floating, origins, side).TrueForAll(p => p.Display.X == p.X && p.Display.Y == p.Y)) return false;
-        Displays.Arrange(own, glasses, floating, origins, side);
+        if (Displays.WithMain(all, Displays.Places(own, glasses, floating, origins, side), Displays.MainOf(all)?.GdiName)
+            .TrueForAll(p => p.Display.X == p.X && p.Display.Y == p.Y)) return false;
+        Displays.Arrange(all, own, glasses, floating, origins, side);
         return true;
     }
 
@@ -944,6 +1038,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             Glasses? found = Glasses.Detect(UsbDevices.List());
             if (!Nullable.Equals(found, glasses)) ScreensChanged();
         }
+        if (ticks % 8 == 0) ReadMainFromWindows();
         LookForDriver();
         TrackPointer();
         PublishDisplayTiles();

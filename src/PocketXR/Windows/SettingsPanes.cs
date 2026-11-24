@@ -108,12 +108,36 @@ public static class SettingsPanes
         var portraitRow = new SettingsRow("Portrait",
             "Turn a floating screen on its side, 1080 x 1920, for code or long pages. Windows turns it, so apps lay out tall.", portrait);
 
+        // Windows' main display (asked by a tester): this PC's screen or a floating screen. The picker has a choice for
+        // each floating screen there is, so it is made again when the count changes, as the layout picker is.
+        var mainPicker = new Border();
+        int mainBuiltFor = -1;
+        var mainInner = new Binder();
+        b.Add(() =>
+        {
+            int count = store.S.Screens;
+            if (count == mainBuiltFor)
+            {
+                mainInner.Sync();
+                return;
+            }
+            mainBuiltFor = count;
+            mainInner = new Binder();
+            mainPicker.Child = new Segmented(mainInner, "Main display", MainDisplay.Titles(count),
+                () => MainDisplay.FloatingIndex(store.S.MainScreen, store.S.Screens) + 1, i => store.Update(s => s.MainScreen = i));
+            mainInner.Sync();
+        });
+        var mainRow = new SettingsRow("Main display",
+            "Which screen is Windows' main display, where the taskbar and new windows go. Changing it in Windows' Settings shows here too.",
+            mainPicker);
+
         return Kit.Card("Screens",
             screensRow,
             driverLine, driver,
             restartLine, restart,
             Kit.Divider(), portraitRow,
             Kit.Divider(), sideRow,
+            Kit.Divider(), mainRow,
             // "Sharper text" (twice the pixels on each screen) is the Mac's; the Windows app does not do it yet, so
             // the switch is left out rather than shown doing nothing.
             Kit.Divider(), layout);

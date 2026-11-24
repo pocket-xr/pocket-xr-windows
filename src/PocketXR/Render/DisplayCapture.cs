@@ -68,12 +68,24 @@ public sealed class DisplayCapture : IDisposable
     public ID3D11ShaderResourceView? Texture => latest;
 
     /// <summary>How the screen's panel is turned against the desktop (DXGI_MODE_ROTATION: 1 upright, 2 a quarter
-    /// turn, 3 half, 4 three quarters). The picture is as the panel is wired; the renderer turns it back.</summary>
+    /// turn, 3 half, 4 three quarters). The picture is as the panel is wired; the renderer turns it back.
+    /// It is the turn of the picture in <see cref="Texture"/>, set with it: a screen turned upright again keeps its old
+    /// turn until its first upright picture arrives, as the picture is the same size either way.</summary>
     public int Rotation => rotation;
     private volatile int rotation = 1;
 
-    /// <summary>The picture's size in pixels, (0, 0) until the first one.</summary>
+    /// <summary>The picture's size in pixels, as the panel is wired, (0, 0) until the first one.</summary>
     public (int Width, int Height) Size { get { lock (gate) return (width, height); } }
+
+    /// <summary>The picture's size as it stands on the desktop (a quarter turn swaps the sides), null until the first one.</summary>
+    public (int Width, int Height)? ShownSize
+    {
+        get
+        {
+            lock (gate) return width > 0 && height > 0 ? ScreenShape.AsShown(width, height, shownTurn) : null;
+        }
+    }
+    private int shownTurn = 1;
 
     /// <summary>New pictures in the last second (a still desktop gives none: Windows only sends what changed).</summary>
     public double Fps { get { lock (gate) return fps; } }
@@ -174,7 +186,9 @@ public sealed class DisplayCapture : IDisposable
                 duplication = output1.DuplicateOutput(device.Device);
             }
             OutduplDescription about = duplication.Description;
-            rotation = (int)about.Rotation is >= 1 and <= 4 ? (int)about.Rotation : 1;
+            // This duplication's turn. Given to the renderer with the first picture of it, not now: until then the
+            // renderer still has the last picture, taken at the turn before.
+            int turn = (int)about.Rotation is >= 1 and <= 4 ? (int)about.Rotation : 1;
             painter = new PointerPainter(device.Device);
             error = null;
             Log.P($"capture {Display.GdiName}: open, {about.ModeDescription.Width}x{about.ModeDescription.Height}"
@@ -259,7 +273,7 @@ public sealed class DisplayCapture : IDisposable
                             {
                                 PointerImage? picture = PointerImage.From((int)shape.Type, (int)shape.Width, (int)shape.Height,
                                     (int)shape.Pitch, shapeBuffer.AsSpan(0, (int)info.PointerShapeBufferSize));
-                                painter.SetShape(picture?.Turned(rotation));
+                                painter.SetShape(picture?.Turned(turn));
                                 lock (gate)
                                 {
                                     pointerShapes++;
@@ -317,9 +331,9 @@ public sealed class DisplayCapture : IDisposable
                     // The pointer comes in the desktop's own place; the picture is as the panel is wired, so on a turned
                     // screen the place, and the arrow itself (see PointerImage.Turned), are turned to match.
                     // The shape's size on the desktop: a quarter-turned shape has its width and height swapped.
-                    bool across = rotation is 2 or 4;
+                    bool across = turn is 2 or 4;
                     int sw = across ? painter.Height : painter.Width, sh = across ? painter.Width : painter.Height;
-                    (int px, int py) = rotation switch
+                    (int px, int py) = turn switch
                     {
                         2 => (pointerY, h - pointerX - sw),
                         3 => (w - pointerX - sw, h - pointerY - sh),
@@ -353,7 +367,8 @@ public sealed class DisplayCapture : IDisposable
                 }
                 pending = false;
                 lastCompose = now;
-                lock (gate) { width = w; height = h; }
+                lock (gate) { width = w; height = h; shownTurn = turn; }
+                rotation = turn;
                 latest = target.View;
             }
         }
