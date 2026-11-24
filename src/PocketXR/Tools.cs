@@ -206,6 +206,25 @@ public static class Tools
             Console.WriteLine($"The host would use: {(pick is var (pw, ph) ? $"{pw}x{ph}" : "the size it has")}");
         }
         var modes = Displays.Modes(d.GdiName);
+        if (Environment.GetCommandLineArgs().Contains("--portrait"))
+        {
+            int r = Displays.SetPortrait(d.GdiName, true);
+            System.Threading.Thread.Sleep(500);
+            var turned = VirtualDisplays.Find(made.Screens[0], Displays.List());
+            Console.WriteLine($"Portrait: {(r == 0 ? "done" : $"refused ({r})")}; now {turned?.Width}x{turned?.Height}, turned {Displays.IsPortrait(d.GdiName)}");
+            if (turned != null)
+            {
+                using var gpu = Render.GpuDevice.Create();
+                using var cap = new Render.DisplayCapture(gpu, turned);
+                cap.Start();
+                for (int i = 0; i < 40 && cap.Texture == null; i++) System.Threading.Thread.Sleep(50);
+                Console.WriteLine($"Capture: {(cap.Texture != null ? "pictures arriving" : "no picture yet")}, rotation {cap.Rotation} (1 upright, 2 a quarter)");
+            }
+            int back = Displays.SetPortrait(d.GdiName, false);
+            System.Threading.Thread.Sleep(500);
+            var upright = VirtualDisplays.Find(made.Screens[0], Displays.List());
+            Console.WriteLine($"Upright again: {(back == 0 ? "done" : $"refused ({back})")}; now {upright?.Width}x{upright?.Height}");
+        }
         Console.WriteLine($"Sizes it offers ({modes.Count}): {string.Join(", ", modes.Select(m => $"{m.Width}x{m.Height}"))}");
         foreach (var size in ScreenLook.ReadabilitySizes)
             Console.WriteLine($"Readability {size.Width}x{size.Height}: {(modes.Contains(size) ? "offered" : "not offered")}");

@@ -129,23 +129,33 @@ public static class Displays
     /// own screen's top), and the glasses' own display to the left of the own screen, out of the pointer's way. Moves only those
     /// displays; the PC's own screen stays where it is. Needs no administrator rights. True when Windows took it.
     /// </summary>
-    public static bool Arrange(DisplayInfo own, DisplayInfo? glasses, IReadOnlyList<DisplayInfo> floating, IReadOnlyList<(int X, int Y)> origins)
+    /// <summary>The places of the floating screens and the glasses' display, with this PC's screen on [side].</summary>
+    public static List<(DisplayInfo Display, int X, int Y)> Places(DisplayInfo own, DisplayInfo? glasses, IReadOnlyList<DisplayInfo> floating,
+        IReadOnlyList<(int X, int Y)> origins, PcSide side)
     {
         var places = new List<(DisplayInfo Display, int X, int Y)>();
-        int bottom = own.Y + own.Height;
+        var sizes = floating.Select(d => (d.Width, d.Height)).ToList();
+        var (bw, bh) = DisplayGrid.Block(origins, sizes);
+        var (bx, by) = DisplayGrid.BlockOrigin(side, own.X, own.Y, own.Width, own.Height, bw, bh);
         for (int i = 0; i < floating.Count && i < origins.Count; i++)
+            places.Add((floating[i], bx + origins[i].X, by + origins[i].Y));
+        // The glasses' display beside this PC's screen, its top level with it, on the side away from the floating
+        // screens, so the pointer leaving them by any edge finds nothing there. (Below them, as on the Mac, was found
+        // in the way on the Steam Deck, 17 Nov 2026: going down off a floating screen landed on it.)
+        if (glasses != null)
         {
-            int x = own.X + own.Width + origins[i].X, y = own.Y + origins[i].Y;
-            places.Add((floating[i], x, y));
-            bottom = Math.Max(bottom, y + floating[i].Height);
+            var (gx, gy) = DisplayGrid.GlassesOrigin(side, own.X, own.Y, own.Width, glasses.Width);
+            places.Add((glasses, gx, gy));
         }
-        // The glasses' display to the left of this PC's screen, its top level with it: away from the floating screens,
-        // so the pointer leaving them by any edge finds nothing there. (Below them, as on the Mac, was found in the way
-        // on the Steam Deck, 17 Nov 2026: going down off a floating screen landed on it.)
-        if (glasses != null) places.Add((glasses, own.X - glasses.Width, own.Y));
+        return places;
+    }
+
+    public static bool Arrange(DisplayInfo own, DisplayInfo? glasses, IReadOnlyList<DisplayInfo> floating, IReadOnlyList<(int X, int Y)> origins, PcSide side = PcSide.Left)
+    {
+        var places = Places(own, glasses, floating, origins, side);
         if (places.TrueForAll(p => p.Display.X == p.X && p.Display.Y == p.Y)) return true;
         bool ok = MoveDisplays(places);
-        Log.P($"displays: floating screens placed beside this PC's screen, the glasses' display to its left: {(ok ? "done" : "not done")}");
+        Log.P($"displays: floating screens placed with this PC's screen {side.Title().ToLowerInvariant()} of them, the glasses' display out of their way: {(ok ? "done" : "not done")}");
         return ok;
     }
 
@@ -213,6 +223,30 @@ public static class Displays
             r = ChangeDisplaySettingsExW(gdiName, ref dm, IntPtr.Zero, CdsUpdateRegistry, IntPtr.Zero);
         }
         return r;
+    }
+
+    /// <summary>
+    /// Turns [gdiName] a quarter (portrait: 1920 x 1080 becomes 1080 x 1920 on the desktop) or back upright, as Windows'
+    /// Display settings, Orientation, do. 0 when done (or already so), else Windows' answer.
+    /// </summary>
+    public static int SetPortrait(string gdiName, bool portrait)
+    {
+        var dm = new DevMode { dmSize = (ushort)Marshal.SizeOf<DevMode>(), dmDeviceName = "", dmFormName = "" };
+        if (!EnumDisplaySettingsW(gdiName, -1, ref dm)) return -1;
+        uint want = portrait ? 1u : 0u; // DMDO_90, DMDO_DEFAULT
+        bool turnedNow = dm.dmDisplayOrientation is 1 or 3;
+        if (dm.dmDisplayOrientation == want) return 0;
+        if (turnedNow != portrait) (dm.dmPelsWidth, dm.dmPelsHeight) = (dm.dmPelsHeight, dm.dmPelsWidth);
+        dm.dmDisplayOrientation = want;
+        dm.dmFields = 0x80 | 0x80000 | 0x100000; // orientation, width, height
+        return ChangeDisplaySettingsExW(gdiName, ref dm, IntPtr.Zero, 0x1, IntPtr.Zero); // CDS_UPDATEREGISTRY
+    }
+
+    /// <summary>Whether [gdiName] is turned a quarter now.</summary>
+    public static bool IsPortrait(string gdiName)
+    {
+        var dm = new DevMode { dmSize = (ushort)Marshal.SizeOf<DevMode>(), dmDeviceName = "", dmFormName = "" };
+        return EnumDisplaySettingsW(gdiName, -1, ref dm) && dm.dmDisplayOrientation is 1 or 3;
     }
 
     /// <summary>The sizes [gdiName] offers (its driver's list of modes), largest first, without repeats.</summary>

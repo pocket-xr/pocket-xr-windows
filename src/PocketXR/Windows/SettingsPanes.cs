@@ -37,7 +37,7 @@ public static class SettingsPanes
     {
         yield return SettingsSpacePreview.Card(store, state, b);
         yield return ScreensCard(store, state, actions, b);
-        yield return ShapeCard(store, actions, b);
+        yield return ShapeCard(store, state, actions, b);
         yield return PresetsCard(store, b, show);
     }
 
@@ -86,21 +86,67 @@ public static class SettingsPanes
                 () => Array.IndexOf(choices, store.S.Layout), i => store.Update(s => s.Layout = choices[i])));
         });
 
+        // Portrait screens, for code: each floating screen can be turned 1080 x 1920.
+        var portrait = new StackPanel { Orientation = Orientation.Horizontal };
+        for (int n = 0; n < 3; n++)
+        {
+            int index = n;
+            var toggle = new Toggle(b, $"Screen {index + 1} portrait", () => store.S.IsPortrait(index), v => store.Update(s => s.SetPortrait(index, v)))
+            { Margin = new Thickness(index == 0 ? 0 : 14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            var label = Kit.Line($"{index + 1}");
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.Margin = new Thickness(index == 0 ? 0 : 18, 0, 6, 0);
+            portrait.Children.Add(label);
+            portrait.Children.Add(toggle);
+            b.Add(() => { toggle.IsEnabled = index < store.S.Screens; label.Opacity = index < store.S.Screens ? 1 : 0.45; });
+        }
+        PcSide[] sides = PcSideExt.All;
+        var sideRow = new SettingsRow("This PC's screen",
+            "Where your PC's own screen sits next to the floating screens, for the pointer: going off that edge of them reaches it. Below suits a laptop under the glasses' screens.",
+            new Segmented(b, "This PC's screen", sides.Select(x => x.Title()).ToList(), () => Array.IndexOf(sides, store.S.PcSide),
+                i => store.Update(s => s.PcSide = sides[i])));
+        var portraitRow = new SettingsRow("Portrait",
+            "Turn a floating screen on its side, 1080 x 1920, for code or long pages. Windows turns it, so apps lay out tall.", portrait);
+
         return Kit.Card("Screens",
             screensRow,
             driverLine, driver,
             restartLine, restart,
+            Kit.Divider(), portraitRow,
+            Kit.Divider(), sideRow,
             // "Sharper text" (twice the pixels on each screen) is the Mac's; the Windows app does not do it yet, so
             // the switch is left out rather than shown doing nothing.
             Kit.Divider(), layout);
     }
 
-    private static FrameworkElement ShapeCard(SettingsStore store, IAppActions actions, Binder b) => Kit.Card("Size and shape",
+    /// <summary>A control that changes only the 3D picture: off, with the reason shown, while the glasses are in 2D and
+    /// Pocket XR can't switch them (AppState.DepthUnseen).</summary>
+    internal static T DepthOnly<T>(Binder b, AppState state, T row) where T : FrameworkElement
+    {
+        b.Add(() =>
+        {
+            row.IsEnabled = !state.DepthUnseen;
+            row.Opacity = state.DepthUnseen ? 0.45 : 1;
+            row.ToolTip = state.DepthUnseen ? AppState.DepthUnseenWhy : null;
+        });
+        return row;
+    }
+
+    private static FrameworkElement DepthNote(Binder b, AppState state)
+    {
+        TextBlock note = Kit.Small(AppState.DepthUnseenWhy);
+        note.Margin = new Thickness(16, 0, 16, 12);
+        b.Add(() => note.Visibility = state.DepthUnseen ? Visibility.Visible : Visibility.Collapsed);
+        return note;
+    }
+
+    private static FrameworkElement ShapeCard(SettingsStore store, AppState state, IAppActions actions, Binder b) => Kit.Card("Size and shape",
         SettingsParts.SliderRow(b, "Size", () => store.S.WidthDeg, v => store.Update(s => s.WidthDeg = v),
             SpaceSettings.WidthRange, 1, SettingsFormat.Degrees),
         Kit.Divider(),
-        SettingsParts.SliderRow(b, "Distance", () => store.S.Distance, v => store.Update(s => s.Distance = v),
-            SpaceSettings.DistanceRange, 0.1, SettingsFormat.Metres),
+        DepthOnly(b, state, SettingsParts.SliderRow(b, "Distance", () => store.S.Distance, v => store.Update(s => s.Distance = v),
+            SpaceSettings.DistanceRange, 0.1, SettingsFormat.Metres)),
+        DepthNote(b, state),
         Kit.Divider(),
         SettingsParts.SliderRow(b, "Curve", () => store.S.Curve, v => store.Update(s => s.Curve = v),
             SpaceSettings.CurveRange, 0.05, SettingsFormat.Curve),
@@ -237,7 +283,7 @@ public static class SettingsPanes
         b.Add(() =>
         {
             bool glasses = state.GlassesName != null;
-            depth.SetNote(!glasses ? "Each eye gets its own picture, so the screens sit at a depth."
+            depth.SetNote(state.DepthUnseen ? AppState.DepthUnseenWhy : !glasses ? "Each eye gets its own picture, so the screens sit at a depth."
                 : state.Stereo ? "The glasses are in 3D now." : "The glasses are in 2D now.");
             now.Visibility = glasses ? Visibility.Visible : Visibility.Collapsed;
             ((TextBlock)now.Child).Text = state.Stereo ? "3D" : "2D";
@@ -267,8 +313,8 @@ public static class SettingsPanes
         yield return Kit.Card("3D",
             depth,
             Kit.Divider(),
-            SettingsParts.SliderRow(b, "Eye distance", () => store.S.IpdMm, v => store.Update(s => s.IpdMm = v),
-                SpaceSettings.IpdRange, 0.5, v => v.ToString("0.0", CultureInfo.InvariantCulture) + " mm"));
+            DepthOnly(b, state, SettingsParts.SliderRow(b, "Eye distance", () => store.S.IpdMm, v => store.Update(s => s.IpdMm = v),
+                SpaceSettings.IpdRange, 0.5, v => v.ToString("0.0", CultureInfo.InvariantCulture) + " mm")));
 
         var swatches = new StackPanel { Orientation = Orientation.Horizontal };
         AutomationProperties.SetName(swatches, "Glow colour");
@@ -313,8 +359,11 @@ public static class SettingsPanes
                 () => store.S.RecentreFollowsTilt, v => store.Update(s => s.RecentreFollowsTilt = v)),
             Kit.Divider(),
             SettingsParts.ToggleRow(b, "Taps on the glasses",
-                "Tap the frame twice to recentre, three times for the next layout. Read from the glasses' own motion sensor. Untested with real taps.",
+                "Tap the frame twice to recentre, three times for the next layout. Read from the glasses' own motion sensor.",
                 () => store.S.Taps, v => store.Update(s => s.Taps = v)),
+            SettingsParts.SliderRow(b, "Tap sensitivity", () => store.S.TapSensitivity, v => store.Update(s => s.TapSensitivity = (int)Math.Round(v)),
+                (GlassesTaps.SensitivityMin, GlassesTaps.SensitivityMax), 5, v => $"{Math.Round(v)}%"),
+            Kit.Note("Higher counts softer taps, lower only firm ones. Pressing the glasses' own buttons can count as a tap, more so when it is high: on a Steam Deck a tester found 25% just enough that they don't."),
             Kit.Divider(),
             SettingsParts.ToggleRow(b, "Head scroll",
                 "Turn your head a little past the screen in front and the row slides that way. Works in Smooth Follow and in Steady mode, not in Body Anchor, where the screens already stay put.",
@@ -438,7 +487,14 @@ public static class SettingsPanes
 
         yield return Kit.Card("Experimental",
             SettingsParts.ToggleRow(b, "Head tracking for XREAL Air, XBX A01 and VITURE (USB HID)", "Untested on a PC.",
-                () => store.S.HidTracking, v => store.Update(s => s.HidTracking = v)));
+                () => store.S.HidTracking, v => store.Update(s => s.HidTracking = v)),
+            Kit.Divider(),
+            SettingsParts.ToggleRow(b, "Use the glasses' buttons",
+                "Lets go of the glasses so their own buttons work, for brightness say: head tracking and taps pause until you turn this off. " +
+                "On the XBX A01+ the buttons come back only when the glasses reset themselves, which can take 1 to 3 minutes: wait for them to blink off and on, " +
+                "set the brightness, then turn this off. For glasses tracked over USB HID (the switch above).",
+                () => state.GlassesButtons, actions.SetGlassesButtons,
+                () => state.Glasses is Glasses g && g.HidImu && !g.NetworkImu && store.S.HidTracking));
 
         // Which glasses do what on a PC, said exactly: only the Aura has been used on one, and only its head tracking.
         yield return Kit.Card("Which glasses work",

@@ -36,6 +36,17 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
   tracking Pocket XR reads, with the Steam Deck's detector and thresholds: a jolt of 0.8 g or more from the 30 ms
   average, quiet before it, back within 40 ms, while the head turns slower than 60 degrees a second, in runs of 2 or 3.
   Asked for by Pierre Zammit.
+- **Portrait screens** (Settings, Space): any floating screen turned on its side, 1080 x 1920, for code or long pages;
+  Windows turns it, so apps lay out tall. Tried on a PC with Apollo's driver (turned and back, the capture's turn
+  undone as for the Steam Deck's own panel); not yet in glasses or with Parsec's driver.
+- **This PC's screen** (Settings, Space: Left, Below, Right, Above): where your PC's own screen sits next to the
+  floating screens on the desktop, for the pointer. Below suits a laptop under the glasses' screens. Checked by sums;
+  not yet with glasses.
+- **Win+Shift+S on a floating screen**: Windows' still snipping overlay covered the glasses' display too, so the glasses
+  showed a still picture; Pocket XR now hides that one part of it, and the Space stays live while you snip. Tried on a
+  PC with two monitors (the hidden monitor live, the other still snipping); not yet with glasses.
+- **Use the glasses' buttons** (Settings, Glasses, Experimental): lets go of glasses tracked over USB HID so their own
+  buttons work (brightness); on the XBX A01+ they come back only when the glasses reset themselves, 1 to 3 minutes.
 - **Text size** (Settings, Picture: Standard, 125%, 150%): larger text on every screen, the screens as wide as before.
   Each screen keeps its 1920 x 1080 pixels and Windows draws it at 125% or 150% (its own per-display scale), so it has
   the room the Mac's 1536 x 864 and 1280 x 720 give and stays sharp. Also for the screens your phone streams. Logged
