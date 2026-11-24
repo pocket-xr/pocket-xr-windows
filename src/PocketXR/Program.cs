@@ -45,7 +45,9 @@ public static class Program
                     case "--capture-test":
                         return Render.RenderTools.CaptureTest(args.Length > 1 && double.TryParse(args[1], out double c) ? c : 3);
                     case "--driver": return Tools.Driver();
-                    case "--screen-look-test": return Tools.ScreenLookTest();
+                    case "--screen-look-test":
+                        return args.Length > 2 && int.TryParse(args[1], out int tw) && int.TryParse(args[2], out int th)
+                            ? Tools.ScreenLookTest(tw, th) : Tools.ScreenLookTest();
                     case "--hands-test": return Tools.HandsTest(args[1]);
                     case "--hands-camera":
                         return Tools.HandsCamera(args.Length > 2 ? args[2] : null, args.Length > 1 && double.TryParse(args[1], out double hs) ? hs : 15);
