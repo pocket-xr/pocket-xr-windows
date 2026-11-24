@@ -125,6 +125,8 @@ public sealed class AppState
     public bool Recentred;
     /// <summary>One line saying where things stand, as the tray icon shows it.</summary>
     public string StatusLine = "Plug in your glasses.";
+    /// <summary>With glasses on USB but no display of theirs: why none was taken, for the Glasses page. Null otherwise.</summary>
+    public string? DisplayWhy;
     /// <summary>"Let my phone stream this PC": where it stands, null while it is off.</summary>
     public string? PhoneStatus;
     /// <summary>The screen count was changed and needs Pocket XR opened again.</summary>

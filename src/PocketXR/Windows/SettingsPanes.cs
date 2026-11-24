@@ -383,14 +383,16 @@ public static class SettingsPanes
             connected.Title.Text = state.GlassesName ?? "No glasses";
             connected.SetNote(!glasses ? "Plug in your glasses."
                 : state.Busy ? "Changing the glasses' settings…"
-                : state.DisplayText ?? "Waiting for the glasses' display.");
+                : state.DisplayText ?? state.DisplayWhy ?? "Waiting for the glasses' display.");
             chips.Visibility = glasses ? Visibility.Visible : Visibility.Collapsed;
             ((TextBlock)link.Child).Text = state.LinkOpen ? "Settings link open" : "No settings link";
             Kit.SetChip(link, state.LinkOpen);
             ((TextBlock)head.Child).Text = state.TrackingOn ? "Head tracking on" : "No head tracking";
             Kit.SetChip(head, state.TrackingOn);
         });
-        yield return Kit.Card("Connected", connected);
+        TextBlock running = Kit.Small($"Pocket XR for Windows {state.Version}, the copy running now.");
+        running.Margin = new Thickness(16, 0, 16, 12);
+        yield return Kit.Card("Connected", connected, running);
 
         // Steady mode.
         TextBlock cannot = Kit.Note("");

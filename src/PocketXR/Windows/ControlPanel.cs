@@ -74,6 +74,10 @@ public static class ControlPanel
         column.Children.Add(Theme.Arrive(Spaced(SpaceCard(store, state, actions, binder)), 3));
         column.Children.Add(Theme.Arrive(Spaced(PhoneCard(store, state, actions, binder)), 4));
         column.Children.Add(Theme.Arrive(Spaced(Footer(actions)), 5));
+        // The version running now, so a copy left running since before an update is plain to see.
+        TextBlock version = Kit.Small($"Pocket XR for Windows {state.Version}");
+        version.Margin = new Thickness(4, 10, 4, 0);
+        column.Children.Add(version);
         return column;
     }
 
