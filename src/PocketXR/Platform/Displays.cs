@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using PocketXR.Core;
@@ -203,6 +204,70 @@ public static class Displays
         }
         return r;
     }
+
+    /// <summary>The sizes [gdiName] offers (its driver's list of modes), largest first, without repeats.</summary>
+    public static List<(int Width, int Height)> Modes(string gdiName)
+    {
+        var found = new List<(int, int)>();
+        var dm = new DevMode { dmSize = (ushort)Marshal.SizeOf<DevMode>(), dmDeviceName = "", dmFormName = "" };
+        for (int i = 0; i < 2000 && EnumDisplaySettingsW(gdiName, i, ref dm); i++)
+        {
+            var size = ((int)dm.dmPelsWidth, (int)dm.dmPelsHeight);
+            if (!found.Contains(size)) found.Add(size);
+        }
+        return found.OrderByDescending(s => s.Item1 * s.Item2).ToList();
+    }
+
+    // Windows' per-display scale (Settings, Display, Scale): DisplayConfigGetDeviceInfo and SetDeviceInfo with types
+    // -3 and -4, not in Windows' headers but stable since Windows 10 (the SetDPI tool and others use them). Counted in
+    // steps from the display's recommended scale (ScreenLook.RelFor).
+    private const int GetDpiScale = -3, SetDpiScale = -4;
+
+    /// <summary>The source (adapter and id) of the display Windows calls [gdiName], or null.</summary>
+    private static (long Adapter, uint Id)? Source(string gdiName)
+    {
+        if (GetDisplayConfigBufferSizes(QdcOnlyActivePaths, out uint pathCount, out uint modeCount) != 0) return null;
+        var paths = new byte[Math.Max(pathCount, 1) * PathSize];
+        var modes = new byte[Math.Max(modeCount, 1) * ModeSize];
+        if (QueryDisplayConfig(QdcOnlyActivePaths, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero) != 0) return null;
+        for (int i = 0; i < pathCount; i++)
+        {
+            long adapter = BitConverter.ToInt64(paths, i * PathSize);
+            uint id = BitConverter.ToUInt32(paths, i * PathSize + 8);
+            if (string.Equals(DeviceString(GetSourceName, 84, adapter, id, 20, 32), gdiName, StringComparison.OrdinalIgnoreCase))
+                return (adapter, id);
+        }
+        return null;
+    }
+
+    /// <summary>[gdiName]'s scale now, percent, and its lowest and highest steps; null if Windows does not say.</summary>
+    public static (int Percent, int MinRel, int MaxRel)? Scale(string gdiName)
+    {
+        if (Source(gdiName) is not (long adapter, uint id)) return null;
+        byte[]? b = DeviceInfo(GetDpiScale, 32, adapter, id);
+        if (b == null) return null;
+        int min = BitConverter.ToInt32(b, 20), cur = BitConverter.ToInt32(b, 24), max = BitConverter.ToInt32(b, 28);
+        return (ScreenLook.PercentFor(cur, min), min, max);
+    }
+
+    /// <summary>Sets [gdiName]'s Windows scale to [percent] (100, 125, 150...). The scale it has afterwards, or null.</summary>
+    public static int? SetScale(string gdiName, int percent)
+    {
+        if (Scale(gdiName) is not (int now, int min, int max)) return null;
+        if (now == percent) return now;
+        if (ScreenLook.RelFor(percent, min, max) is not int rel || Source(gdiName) is not (long adapter, uint id)) return now;
+        var buffer = new byte[24];
+        BitConverter.TryWriteBytes(buffer.AsSpan(0, 4), SetDpiScale);
+        BitConverter.TryWriteBytes(buffer.AsSpan(4, 4), 24);
+        BitConverter.TryWriteBytes(buffer.AsSpan(8, 8), adapter);
+        BitConverter.TryWriteBytes(buffer.AsSpan(16, 4), id);
+        BitConverter.TryWriteBytes(buffer.AsSpan(20, 4), rel);
+        DisplayConfigSetDeviceInfo(buffer);
+        return Scale(gdiName)?.Percent;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern int DisplayConfigSetDeviceInfo([In] byte[] packet);
 
     [DllImport("user32.dll", EntryPoint = "SetDisplayConfig")]
     private static extern int SetDisplayConfig(uint pathCount, [In] byte[] paths, uint modeCount, [In] byte[] modes, uint flags);

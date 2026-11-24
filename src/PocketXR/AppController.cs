@@ -550,11 +550,17 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     {
         if (standIn != null || !State.DriverReady) return;
         int wanted = Store.S.Screens;
-        // Readability: the screen drawn at 1440 x 810 (ReadabilityMode), else 1920 x 1080.
-        var size = ReadabilityMode.ScreenSize(Store.S.Readability);
-        if (displays != null && displays.Screens.Count == wanted && madeSize == size) return;
+        bool readability = Store.S.Readability;
+        // Readability: 1440 x 810, or the nearest 16:9 size the driver offers; else 1920 x 1080 (ScreenLook).
+        var sizes = ScreenLook.FloatingSizes(readability);
+        if (displays != null && displays.Screens.Count == wanted && madeForReadability == readability)
+        {
+            ApplyTextSize();
+            return;
+        }
         displays?.Dispose();
-        madeSize = size;
+        madeForReadability = readability;
+        var size = sizes[0];
         displays = VirtualDisplays.Make(wanted, size.Width, size.Height, 60, out string why);
         if (displays == null)
         {
@@ -570,24 +576,59 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             if (floating.Count == wanted) break;
             Thread.Sleep(100);
         }
-        // Windows may bring a display back at the size it remembered for it: set the one wanted.
+        // Each display at the first wanted size its driver offers (Parsec's list has no 1440 x 810), set if Windows
+        // brought it back at a size it remembered.
+        bool changed = false;
         foreach (DisplayInfo d in floating.ToList())
         {
-            if (d.Width == size.Width && d.Height == size.Height) continue;
-            int r = Displays.SetMode(d.GdiName, size.Width, size.Height, 60);
-            Log.P($"virtual displays: {d.GdiName} came at {d.Width}x{d.Height}: set to {size.Width}x{size.Height} ({(r == 0 ? "done" : $"refused, {r}")})");
+            var offered = Displays.Modes(d.GdiName);
+            var pick = sizes.FirstOrDefault(s => offered.Contains(s));
+            if (pick == default) pick = sizes[0];
+            if (readability)
+                Log.P($"virtual displays: {d.GdiName} offers {string.Join(", ", sizes.Select(s => $"{s.Width}x{s.Height} {(offered.Contains(s) ? "yes" : "no")}"))}");
+            if (d.Width == pick.Width && d.Height == pick.Height) continue;
+            int r = Displays.SetMode(d.GdiName, pick.Width, pick.Height, 60);
+            changed = true;
+            Log.P($"virtual displays: {d.GdiName} came at {d.Width}x{d.Height}: set to {pick.Width}x{pick.Height} ({(r == 0 ? "done" : $"refused, {r}")})");
         }
-        if (floating.Any(d => d.Width != size.Width || d.Height != size.Height))
+        if (changed)
         {
             Thread.Sleep(300);
             RefreshFloating(Displays.List());
         }
+        // Readability's width follows the size made: about 42 screen pixels a degree, as 1440 across 34 degrees.
+        if (readability && floating.Count > 0 && Store.S.ReadabilityBeforeWidthDeg != null)
+        {
+            double width = ReadabilityMode.WidthFor(floating[0].Width);
+            if (Math.Abs(Store.S.WidthDeg - width) > 0.05)
+            {
+                Log.P($"readability: the screen is {floating[0].Width}x{floating[0].Height}, so {width:0.#}° wide (about {ReadabilityMode.PixelsPerDegree:0} pixels a degree)");
+                Store.Update(s => s.WidthDeg = width);
+            }
+        }
+        ApplyTextSize();
         Log.P($"virtual displays: {floating.Count} of {wanted} are on the desktop, " +
-            string.Join(", ", floating.Select(d => $"{d.Width}x{d.Height}")));
+            string.Join(", ", floating.Select(d => $"{d.GdiName} {d.Width}x{d.Height} at {Displays.Scale(d.GdiName)?.Percent.ToString() ?? "?"}%")));
     }
 
-    /// <summary>The size the floating screens were made at.</summary>
-    private (int Width, int Height) madeSize = (1920, 1080);
+    /// <summary>Whether the floating screens were made for Readability (its sizes) or not (1920 x 1080).</summary>
+    private bool madeForReadability;
+
+    /// <summary>
+    /// Text size: each floating screen shown at Windows' scale for it (100, 125 or 150 percent; 100 with Readability
+    /// on), so text is larger at the same width as seen and every pixel is still there. Logged when it changes.
+    /// </summary>
+    private void ApplyTextSize()
+    {
+        int scale = ScreenLook.Scale(Store.S.Readability, Store.S.TextScale);
+        foreach (DisplayInfo d in floating)
+        {
+            int? now = Displays.Scale(d.GdiName)?.Percent;
+            if (now == scale) continue;
+            int? got = Displays.SetScale(d.GdiName, scale);
+            Log.P($"text size: {d.GdiName} {d.Width}x{d.Height} from {now?.ToString() ?? "?"}% to {scale}%: {(got == scale ? "done" : $"Windows has {got?.ToString() ?? "?"}%")}");
+        }
+    }
 
     // MARK: settings
 
@@ -605,8 +646,15 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         {
             // Logged with what it changed: before and after.
             Log.P(now.Readability
-                ? $"readability: on: {ReadabilityMode.Line(old)} -> {ReadabilityMode.Line(now)}, screen {ReadabilityMode.Width}x{ReadabilityMode.Height}"
-                : $"readability: off: {ReadabilityMode.Line(old)} -> {ReadabilityMode.Line(now)}, screens 1920x1080");
+                ? $"readability: on: {ReadabilityMode.Line(old)} -> {ReadabilityMode.Line(now)}, screen {ReadabilityMode.Width}x{ReadabilityMode.Height} if the driver offers it"
+                : $"readability: off: {ReadabilityMode.Line(old)} -> {ReadabilityMode.Line(now)}, screens 1920x1080 at {ScreenLook.Title(now.TextScale)}");
+        }
+        if (old.TextScale != now.TextScale)
+        {
+            Log.P($"text size: {ScreenLook.Title(old.TextScale)} -> {ScreenLook.Title(now.TextScale)}" +
+                (now.Readability ? " (Readability is on: it keeps its own size until it is turned off)" : ""));
+            ApplyTextSize();
+            phoneHost?.ScreensLookChanged();
         }
         if ((old.Screens != now.Screens || old.Readability != now.Readability) && glassesDisplay != null && standIn == null)
         {
@@ -1402,6 +1450,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             try
             {
                 h = new PcHost.HostServer(PcHost.HostServer.DefaultBasePort, null);
+                h.Look = () => (Store.S.Readability, Store.S.TextScale);
                 var host = h;
                 host.PinAsked += () => ui.BeginInvoke(() => PinSoon(host));
                 host.Start();
