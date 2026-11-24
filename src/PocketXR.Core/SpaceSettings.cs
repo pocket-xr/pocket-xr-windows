@@ -373,6 +373,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     public bool HeadScroll = false;
     /// <summary>Taps on the glasses (GlassesTaps): two recentre, three go to the next layout. Untested with real taps.</summary>
     public bool Taps = false;
+    /// <summary>Tap sensitivity, percent, 25 to 300 (GlassesTaps.SetSensitivity): 100 the Steam Deck's values.</summary>
+    public int TapSensitivity = 100;
     /// <summary>The pointer jumps to the screen you look at when it is on another screen.</summary>
     public bool PointerFollowsHead = false;
 
@@ -457,6 +459,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             s.Distance = Held(s.Distance, DistanceRange);
             s.Curve = Held(s.Curve, CurveRange);
             s.TextScale = ScreenLook.Nearest(s.TextScale);
+            s.TapSensitivity = Math.Clamp(s.TapSensitivity, GlassesTaps.SensitivityMin, GlassesTaps.SensitivityMax);
             s.IpdMm = Held(s.IpdMm, IpdRange);
             s.Glow = Held(s.Glow, (0, 1));
             s.Brightness = Held(s.Brightness, BrightnessRange);
@@ -578,6 +581,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         DisplayDelayMs = other.DisplayDelayMs;
         HeadScroll = other.HeadScroll;
         Taps = other.Taps;
+        TapSensitivity = other.TapSensitivity;
         PointerFollowsHead = other.PointerFollowsHead;
         SteadySixDof = other.SteadySixDof;
         SteadyOn = other.SteadyOn;
@@ -613,7 +617,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             && EdgeFade == other.EdgeFade && Brightness == other.Brightness && HeadTracking == other.HeadTracking
             && TrackingMode == other.TrackingMode && RecentreFollowsTilt == other.RecentreFollowsTilt
             && DrawSmoothing == other.DrawSmoothing && StillLock == other.StillLock
-            && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll && Taps == other.Taps
+            && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll && Taps == other.Taps && TapSensitivity == other.TapSensitivity
             && PointerFollowsHead == other.PointerFollowsHead && SteadySixDof == other.SteadySixDof && SteadyOn == other.SteadyOn
             && HidTracking == other.HidTracking && Shortcuts == other.Shortcuts && LaunchAtLogin == other.LaunchAtLogin
             && TourSeen == other.TourSeen && PanelAtStart == other.PanelAtStart
@@ -687,6 +691,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("displayDelayMs", x => x.WriteNumberValue(DisplayDelayMs)),
             ("headScroll", x => x.WriteBooleanValue(HeadScroll)),
             ("taps", x => x.WriteBooleanValue(Taps)),
+            ("tapSensitivity", x => x.WriteNumberValue(TapSensitivity)),
             ("pointerFollowsHead", x => x.WriteBooleanValue(PointerFollowsHead)),
             ("steadySixDof", x => x.WriteBooleanValue(SteadySixDof)),
             ("steadyOn", x => x.WriteBooleanValue(SteadyOn)),
@@ -768,6 +773,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         if (SpaceSettingsJson.Has(c, "displayDelayMs", out v)) s.DisplayDelayMs = SpaceSettingsJson.Double(v);
         if (SpaceSettingsJson.Has(c, "headScroll", out v)) s.HeadScroll = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "taps", out v)) s.Taps = SpaceSettingsJson.Bool(v);
+        if (SpaceSettingsJson.Has(c, "tapSensitivity", out v)) s.TapSensitivity = SpaceSettingsJson.Int(v);
         if (SpaceSettingsJson.Has(c, "pointerFollowsHead", out v)) s.PointerFollowsHead = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadySixDof", out v)) s.SteadySixDof = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadyOn", out v)) s.SteadyOn = SpaceSettingsJson.Bool(v);

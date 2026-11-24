@@ -488,8 +488,8 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
 
     private void SetTaps(bool on)
     {
-        taps = on ? new GlassesTaps(n => ui.BeginInvoke(() => Tapped(n))) : null;
-        Log.P($"taps on the glasses: {(on ? "on (untested with real taps)" : "off")}");
+        taps = on ? new GlassesTaps(n => ui.BeginInvoke(() => Tapped(n)), line => Log.P(line), Store.S.TapSensitivity) : null;
+        Log.P($"taps on the glasses: {(on ? $"on, sensitivity {Store.S.TapSensitivity}% (untested with real taps on Windows)" : "off")}");
     }
 
     /// <summary>Two taps recentre; three go to the next layout (the closest to the Steam Deck's "switch view": the
@@ -689,6 +689,11 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         if (old.Shortcuts != now.Shortcuts) RegisterShortcuts();
         if (old.LaunchAtLogin != now.LaunchAtLogin) SignIn.Set(now.LaunchAtLogin);
         if (old.Taps != now.Taps) SetTaps(now.Taps);
+        if (old.TapSensitivity != now.TapSensitivity && taps is GlassesTaps tp)
+        {
+            tp.SetSensitivity(now.TapSensitivity);
+            Log.P($"taps on the glasses: sensitivity {tp.Sensitivity}%: a tap is a jolt of {tp.TapGNow:0.00} g with a {tp.JerkGNow:0.00} g jump in 3 ms");
+        }
         if (old.PhoneStreamsPc != now.PhoneStreamsPc)
         {
             if (now.PhoneStreamsPc) StartPhone();
