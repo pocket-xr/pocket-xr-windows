@@ -13,7 +13,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\PocketXR.ico</ApplicationIcon>
-    <Version>0.4.6</Version>
+    <Version>0.4.7</Version>
     <Product>Pocket XR</Product>
     <AssemblyTitle>Pocket XR</AssemblyTitle>
     <Company>Pocket XR</Company>
