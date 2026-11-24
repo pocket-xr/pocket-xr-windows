@@ -243,20 +243,26 @@ public static class SettingsPanes
             ((TextBlock)now.Child).Text = state.Stereo ? "3D" : "2D";
             Kit.SetChip(now, state.Stereo);
         });
-        TextBlock readNote = Kit.Small("");
-        b.Add(() => readNote.Text = store.S.Readability
-            ? $"On: one screen at {ReadabilityMode.Width} x {ReadabilityMode.Height}, {store.S.WidthDeg:0.#}° wide. Turn it off to put your screens back as they were."
-            : "Larger, sharp text: one screen at a lower resolution, as wide as one of its pixels to one of the glasses'. Untested on glasses.");
-        readNote.Margin = new Thickness(16, 0, 16, 12);
-        yield return Kit.Card("Readability",
-            SettingsParts.ToggleRow(b, "Readability", null,
+        int[] scales = ScreenLook.TextScales;
+        var p125 = ScreenLook.PointSize(125);
+        var p150 = ScreenLook.PointSize(150);
+        yield return Kit.Card("Screens",
+            new SettingsRow("Text size",
+                "Larger text on every screen, the screens as wide as before, so the side screens do not move further out. " +
+                $"Each screen keeps its 1920 x 1080 pixels and Windows draws it at 125% or 150% (room for {p125.Width} x {p125.Height} or {p150.Width} x {p150.Height}), so it stays sharp. " +
+                "Also for the screens your phone streams. Readability uses its own size.",
+                new Segmented(b, "Text size", scales.Select(ScreenLook.Title).ToList(), () => Array.IndexOf(scales, ScreenLook.Nearest(store.S.TextScale)),
+                    i => store.Update(s => s.TextScale = scales[i]))),
+            Kit.Divider(),
+            SettingsParts.ToggleRow(b, "Readability",
+                $"Larger, clearer text: one screen at 1440 x 810, {ReadabilityMode.WidthDegrees:0}° wide (with Parsec's driver, which has no 1440 x 810, the nearest it offers, as wide again for its size). " +
+                "Turning it off puts your screens and size back as they were. Not yet tried with glasses.",
                 () => store.S.Readability,
                 v => store.Update(s =>
                 {
-                    if (v) ReadabilityMode.TurnOn(s, ReadabilityMode.WidthDeg(state.Glasses));
+                    if (v) ReadabilityMode.TurnOn(s);
                     else ReadabilityMode.TurnOff(s);
-                })),
-            readNote);
+                })));
 
         yield return Kit.Card("3D",
             depth,

@@ -171,6 +171,45 @@ public static class Tools
     }
 
     /// <summary>The virtual display driver's own details. Changes nothing: no display is added.</summary>
+    /// <summary>
+    /// PocketXR --screen-look-test: one virtual display of its own for a few seconds, to see what Text size and
+    /// Readability can do with this PC's driver: the sizes it offers, and Windows' scale set to 125 and 150 percent and
+    /// read back. Then it is removed. Changes nothing else.
+    /// </summary>
+    public static int ScreenLookTest()
+    {
+        using VirtualDisplays? made = VirtualDisplays.Make(1, 1920, 1080, 60, out string why, idOffset: 0x70);
+        if (made == null)
+        {
+            Console.WriteLine($"No virtual display: {why}.");
+            return 1;
+        }
+        DisplayInfo? d = null;
+        for (int i = 0; i < 50 && d == null; i++)
+        {
+            d = VirtualDisplays.Find(made.Screens[0], Displays.List());
+            if (d == null) System.Threading.Thread.Sleep(100);
+        }
+        if (d == null)
+        {
+            Console.WriteLine("The virtual display did not reach the desktop.");
+            return 1;
+        }
+        Console.WriteLine($"Made: {d}");
+        var modes = Displays.Modes(d.GdiName);
+        Console.WriteLine($"Sizes it offers ({modes.Count}): {string.Join(", ", modes.Select(m => $"{m.Width}x{m.Height}"))}");
+        foreach (var size in ScreenLook.ReadabilitySizes)
+            Console.WriteLine($"Readability {size.Width}x{size.Height}: {(modes.Contains(size) ? "offered" : "not offered")}");
+        Console.WriteLine($"1920x1200: {(modes.Contains((1920, 1200)) ? "offered" : "not offered")}");
+        Console.WriteLine($"Scale now: {Displays.Scale(d.GdiName)?.ToString() ?? "not given"}");
+        foreach (int want in new[] { 125, 150, 100 })
+        {
+            int? got = Displays.SetScale(d.GdiName, want);
+            Console.WriteLine($"Scale {want}%: {(got is int g ? $"now {g}%" : "not set")}");
+        }
+        return 0;
+    }
+
     public static int Driver()
     {
         VirtualDisplays.DriverInfo? info = VirtualDisplays.Probe(out string why);

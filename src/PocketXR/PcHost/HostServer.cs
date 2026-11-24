@@ -57,6 +57,8 @@ internal sealed class HostServer : IDisposable
         public int Codec;
         public HostAudio? Audio;
         public Platform.VirtualDisplays? Screen;
+        /// <summary>The made screen's Windows name, for Text size changes while it streams.</summary>
+        public string? ScreenName;
         public bool VirtualWanted;
         public int AudioMs = 5;
         public bool AudioEncrypted = true;
@@ -371,12 +373,36 @@ internal sealed class HostServer : IDisposable
         }, null, 10_000, 10_000);
     }
 
-    /// <summary>A virtual display of the stream's own size (the phone's window shape), made for this stream; its
-    /// Windows name once it is on the desktop, or null (the main display is streamed then).</summary>
+    /// <summary>
+    /// The app's Text size and Readability for the screens this host makes (Settings, Picture), read when a stream
+    /// starts; (false, 100) when the host runs on its own (PocketXR --host).
+    /// </summary>
+    public Func<(bool Readability, int TextScale)> Look = () => (false, 100);
+
+    /// <summary>Text size changed: the screen being streamed now is shown at the new scale.</summary>
+    public void ScreensLookChanged()
+    {
+        string? gdi;
+        lock (gate) gdi = session?.ScreenName;
+        if (gdi == null) return;
+        var look = Look();
+        int scale = ScreenLook.Scale(look.Readability, look.TextScale);
+        int? got = Platform.Displays.SetScale(gdi, scale);
+        Log.P($"host: text size: {gdi} now at {got?.ToString() ?? "?"}% (wanted {scale}%)");
+    }
+
+    /// <summary>
+    /// A virtual display of the stream's own size (the phone's window shape), made for this stream; its Windows name
+    /// once it is on the desktop, or null (the main display is streamed then). With Readability on, three quarters of
+    /// that size (text larger, scaled up for the stream); with a Text size, shown at that Windows scale.
+    /// </summary>
     private string? MakeScreen(Session s)
     {
         var sw = Stopwatch.StartNew();
-        var made = Platform.VirtualDisplays.Make(1, s.Width, s.Height, Math.Max(30, s.Fps), out string why, idOffset: 0x40);
+        var look = Look();
+        var (w, h) = ScreenLook.HostSize(s.Width, s.Height, look.Readability);
+        int scale = ScreenLook.Scale(look.Readability, look.TextScale);
+        var made = Platform.VirtualDisplays.Make(1, w, h, Math.Max(30, s.Fps), out string why, idOffset: 0x40);
         if (made == null)
         {
             Log.P($"host: no virtual display: {why}");
@@ -389,19 +415,22 @@ internal sealed class HostServer : IDisposable
             if (d != null)
             {
                 var first = d;
-                if (d.Width != s.Width || d.Height != s.Height)
+                if (d.Width != w || d.Height != h)
                 {
-                    // Windows brought it back at the size it remembered for this display: set the stream's.
-                    int r = Platform.Displays.SetMode(d.GdiName, s.Width, s.Height, Math.Max(30, s.Fps));
+                    // Windows brought it back at the size it remembered for this display: set the one wanted.
+                    int r = Platform.Displays.SetMode(d.GdiName, w, h, Math.Max(30, s.Fps));
                     for (int j = 0; j < 30 && r == 0; j++)
                     {
                         var now = Platform.VirtualDisplays.Find(made.Screens[0], Platform.Displays.List());
-                        if (now != null && now.Width == s.Width && now.Height == s.Height) { d = now; break; }
+                        if (now != null && now.Width == w && now.Height == h) { d = now; break; }
                         Thread.Sleep(100);
                     }
-                    Log.P($"host: virtual display came at {first.Width}x{first.Height}: set to {s.Width}x{s.Height} ({(r == 0 ? "done" : $"refused, {r}")})");
+                    Log.P($"host: virtual display came at {first.Width}x{first.Height}: set to {w}x{h} ({(r == 0 ? "done" : $"refused, {r}")})");
                 }
-                Log.P($"host: virtual display {d.GdiName} {d.Width}x{d.Height} at {d.X},{d.Y}, ready after {sw.ElapsedMilliseconds} ms");
+                int? scaled = Platform.Displays.SetScale(d.GdiName, scale);
+                s.ScreenName = d.GdiName;
+                Log.P($"host: virtual display {d.GdiName} {d.Width}x{d.Height} at {d.X},{d.Y}, Windows scale {scaled?.ToString() ?? "?"}% " +
+                    $"(stream {s.Width}x{s.Height}{(look.Readability ? ", Readability" : "")}, text size {ScreenLook.Title(scale)}), ready after {sw.ElapsedMilliseconds} ms");
                 return d.GdiName;
             }
             Thread.Sleep(100);

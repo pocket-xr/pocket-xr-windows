@@ -324,6 +324,9 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     public double Curve = 0.0;
     /// <summary>HiDPI virtual displays (twice the pixels). Takes effect when Pocket XR starts.</summary>
     public bool SharperText = false;
+    /// <summary>Text size, percent: 100, 125 or 150 (ScreenLook.TextScales), as on the Mac. Above 100 each screen is
+    /// drawn at that Windows scale, so text and everything else is larger at the same width as seen, and sharp.</summary>
+    public int TextScale = 100;
     public List<SpacePreset> Presets = new();
     /// <summary>
     /// Where the whole Space has been moved to by hand, degrees from where Recentre put it (left and up positive).
@@ -453,6 +456,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             s.WidthDeg = Held(s.WidthDeg, WidthRange);
             s.Distance = Held(s.Distance, DistanceRange);
             s.Curve = Held(s.Curve, CurveRange);
+            s.TextScale = ScreenLook.Nearest(s.TextScale);
             s.IpdMm = Held(s.IpdMm, IpdRange);
             s.Glow = Held(s.Glow, (0, 1));
             s.Brightness = Held(s.Brightness, BrightnessRange);
@@ -552,6 +556,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         Distance = other.Distance;
         Curve = other.Curve;
         SharperText = other.SharperText;
+        TextScale = other.TextScale;
         Presets = other.Presets;
         OffsetYawDeg = other.OffsetYawDeg;
         OffsetPitchDeg = other.OffsetPitchDeg;
@@ -600,7 +605,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     {
         if (other is null) return false;
         return Screens == other.Screens && Layout == other.Layout && WidthDeg == other.WidthDeg
-            && Distance == other.Distance && Curve == other.Curve && SharperText == other.SharperText
+            && Distance == other.Distance && Curve == other.Curve && SharperText == other.SharperText && TextScale == other.TextScale
             && Presets.SequenceEqual(other.Presets) && OffsetYawDeg == other.OffsetYawDeg
             && OffsetPitchDeg == other.OffsetPitchDeg && SpaceSettingsJson.SameList(ScreenYawDeg, other.ScreenYawDeg)
             && SpaceSettingsJson.SameList(ScreenPitchDeg, other.ScreenPitchDeg) && SteadyZoom == other.SteadyZoom && SteadyGapDeg == other.SteadyGapDeg
@@ -655,6 +660,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("distance", x => x.WriteNumberValue(Distance)),
             ("curve", x => x.WriteNumberValue(Curve)),
             ("sharperText", x => x.WriteBooleanValue(SharperText)),
+            ("textScale", x => x.WriteNumberValue(TextScale)),
             ("presets", x =>
             {
                 x.WriteStartArray();
@@ -733,6 +739,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         if (SpaceSettingsJson.Has(c, "distance", out v)) s.Distance = SpaceSettingsJson.Double(v);
         if (SpaceSettingsJson.Has(c, "curve", out v)) s.Curve = SpaceSettingsJson.Double(v);
         if (SpaceSettingsJson.Has(c, "sharperText", out v)) s.SharperText = SpaceSettingsJson.Bool(v);
+        if (SpaceSettingsJson.Has(c, "textScale", out v)) s.TextScale = SpaceSettingsJson.Int(v);
         if (SpaceSettingsJson.Has(c, "presets", out v))
         {
             if (v.ValueKind != JsonValueKind.Array) throw new JsonException("presets is not a list");

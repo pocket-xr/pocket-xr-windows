@@ -36,12 +36,17 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
   tracking Pocket XR reads, with the Steam Deck's detector and thresholds: a jolt of 0.8 g or more from the 30 ms
   average, quiet before it, back within 40 ms, while the head turns slower than 60 degrees a second, in runs of 2 or 3.
   Asked for by Pierre Zammit.
-- **Readability** (Settings, Picture; off by default; untested on glasses): larger, sharp text on 1080p glasses. One
-  floating screen drawn at 1440 x 810, shown just wide enough that one of its pixels covers about one of the glasses'
-  (about 32 degrees on the XREAL Air, 51 on the Aura, 30 if the glasses are not known). It changes only the screen
+- **Text size** (Settings, Picture: Standard, 125%, 150%): larger text on every screen, the screens as wide as before.
+  Each screen keeps its 1920 x 1080 pixels and Windows draws it at 125% or 150% (its own per-display scale), so it has
+  the room the Mac's 1536 x 864 and 1280 x 720 give and stays sharp. Also for the screens your phone streams. Logged
+  for each screen. Set and read back on a virtual display (SudoVDA) on a PC; not yet seen in glasses.
+- **Readability** (Settings, Picture; off by default; untested on glasses), as on the Mac: one floating screen at
+  1440 x 810, 34 degrees wide, about 42 of its pixels a degree, as a 1080p pair of glasses like the XREAL Air shows (the
+  usual screens are 48). Parsec's virtual display driver offers no 1440 x 810, so with it the nearest 16:9 size it
+  offers is used (1280 x 720) and the width is set from it, still about 42 pixels a degree. It changes only the screen
   count, the screens' width and screens moved by hand, keeps what they were, and puts exactly those back when turned
-  off; both are logged with the values before and after. After an idea by Dmitriy Cherdantsev, a Pocket XR for Mac
-  tester.
+  off; both are logged with the values before and after. A phone streaming this PC with Readability on gets a screen
+  three quarters of its size, drawn larger. After an idea by Dmitriy Cherdantsev, a Pocket XR for Mac tester.
 - **Tour**: eight steps, opens the first time.
 - **Launcher** (Ctrl+Alt+Space), **Pocket mode** (Ctrl+Alt+K), a **game controller** as a remote.
 - **Hand tracking** (Ctrl+Alt+H): a webcam that faces you makes an air trackpad (move your hand, pinch to click), and
