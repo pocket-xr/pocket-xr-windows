@@ -96,6 +96,18 @@ public sealed class AppState
     public bool TrackingOn;
     /// <summary>"Use the glasses' buttons": Pocket XR has let go of the glasses' USB HID (no stream, no heartbeat).</summary>
     public bool GlassesButtons;
+
+    /// <summary>
+    /// The glasses show a 2D picture and Pocket XR cannot switch them to 3D side by side (no settings link on a PC: the
+    /// Air family and the XBX), so distance and eye distance, which change only the 3D picture, do nothing that can be
+    /// seen (a tester's XBX A01+ stayed 1920 x 1080 while 3D was turned on, 24 Nov 2026).
+    /// </summary>
+    public bool DepthUnseen => Glasses is Glasses g && !g.ControlLink && DisplayText != null && !Stereo;
+
+    /// <summary>Why, for the controls that are turned off then.</summary>
+    public const string DepthUnseenWhy = "These glasses show a 2D picture, and Pocket XR can't switch them to 3D side by side (they have no settings link on a PC). " +
+        "Distance and eye distance change only the 3D picture, so they do nothing here. If the glasses have a 3D mode of their own, turning it on there " +
+        "makes their display 3840 x 1080 and these work.";
     /// <summary>Head tracking reports a second.</summary>
     public int ImuHz;
     /// <summary>The gyro's bias has been learnt from stillness.</summary>

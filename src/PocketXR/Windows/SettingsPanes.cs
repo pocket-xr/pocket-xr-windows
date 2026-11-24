@@ -37,7 +37,7 @@ public static class SettingsPanes
     {
         yield return SettingsSpacePreview.Card(store, state, b);
         yield return ScreensCard(store, state, actions, b);
-        yield return ShapeCard(store, actions, b);
+        yield return ShapeCard(store, state, actions, b);
         yield return PresetsCard(store, b, show);
     }
 
@@ -95,12 +95,34 @@ public static class SettingsPanes
             Kit.Divider(), layout);
     }
 
-    private static FrameworkElement ShapeCard(SettingsStore store, IAppActions actions, Binder b) => Kit.Card("Size and shape",
+    /// <summary>A control that changes only the 3D picture: off, with the reason shown, while the glasses are in 2D and
+    /// Pocket XR can't switch them (AppState.DepthUnseen).</summary>
+    internal static T DepthOnly<T>(Binder b, AppState state, T row) where T : FrameworkElement
+    {
+        b.Add(() =>
+        {
+            row.IsEnabled = !state.DepthUnseen;
+            row.Opacity = state.DepthUnseen ? 0.45 : 1;
+            row.ToolTip = state.DepthUnseen ? AppState.DepthUnseenWhy : null;
+        });
+        return row;
+    }
+
+    private static FrameworkElement DepthNote(Binder b, AppState state)
+    {
+        TextBlock note = Kit.Small(AppState.DepthUnseenWhy);
+        note.Margin = new Thickness(16, 0, 16, 12);
+        b.Add(() => note.Visibility = state.DepthUnseen ? Visibility.Visible : Visibility.Collapsed);
+        return note;
+    }
+
+    private static FrameworkElement ShapeCard(SettingsStore store, AppState state, IAppActions actions, Binder b) => Kit.Card("Size and shape",
         SettingsParts.SliderRow(b, "Size", () => store.S.WidthDeg, v => store.Update(s => s.WidthDeg = v),
             SpaceSettings.WidthRange, 1, SettingsFormat.Degrees),
         Kit.Divider(),
-        SettingsParts.SliderRow(b, "Distance", () => store.S.Distance, v => store.Update(s => s.Distance = v),
-            SpaceSettings.DistanceRange, 0.1, SettingsFormat.Metres),
+        DepthOnly(b, state, SettingsParts.SliderRow(b, "Distance", () => store.S.Distance, v => store.Update(s => s.Distance = v),
+            SpaceSettings.DistanceRange, 0.1, SettingsFormat.Metres)),
+        DepthNote(b, state),
         Kit.Divider(),
         SettingsParts.SliderRow(b, "Curve", () => store.S.Curve, v => store.Update(s => s.Curve = v),
             SpaceSettings.CurveRange, 0.05, SettingsFormat.Curve),
@@ -237,7 +259,7 @@ public static class SettingsPanes
         b.Add(() =>
         {
             bool glasses = state.GlassesName != null;
-            depth.SetNote(!glasses ? "Each eye gets its own picture, so the screens sit at a depth."
+            depth.SetNote(state.DepthUnseen ? AppState.DepthUnseenWhy : !glasses ? "Each eye gets its own picture, so the screens sit at a depth."
                 : state.Stereo ? "The glasses are in 3D now." : "The glasses are in 2D now.");
             now.Visibility = glasses ? Visibility.Visible : Visibility.Collapsed;
             ((TextBlock)now.Child).Text = state.Stereo ? "3D" : "2D";
@@ -267,8 +289,8 @@ public static class SettingsPanes
         yield return Kit.Card("3D",
             depth,
             Kit.Divider(),
-            SettingsParts.SliderRow(b, "Eye distance", () => store.S.IpdMm, v => store.Update(s => s.IpdMm = v),
-                SpaceSettings.IpdRange, 0.5, v => v.ToString("0.0", CultureInfo.InvariantCulture) + " mm"));
+            DepthOnly(b, state, SettingsParts.SliderRow(b, "Eye distance", () => store.S.IpdMm, v => store.Update(s => s.IpdMm = v),
+                SpaceSettings.IpdRange, 0.5, v => v.ToString("0.0", CultureInfo.InvariantCulture) + " mm")));
 
         var swatches = new StackPanel { Orientation = Orientation.Horizontal };
         AutomationProperties.SetName(swatches, "Glow colour");

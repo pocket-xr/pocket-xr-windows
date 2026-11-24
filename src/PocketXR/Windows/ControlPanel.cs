@@ -421,7 +421,7 @@ public static class ControlPanel
         };
         var nearer = new SmallButton("Nearer", () => actions.Adjust(SpaceAdjust.Nearer));
         var further = new SmallButton("Further", () => actions.Adjust(SpaceAdjust.Further));
-        StackPanel depth = Kit.Across(6, nearer, further);
+        StackPanel depth = SettingsPanes.DepthOnly(binder, state, Kit.Across(6, nearer, further));
         depth.HorizontalAlignment = HorizontalAlignment.Right;
         depth.VerticalAlignment = VerticalAlignment.Bottom;
         depth.Margin = new Thickness(10);
@@ -786,7 +786,7 @@ public static class ControlPanel
                     holder.Children.Add(Kit.Divider());
                     var sliders = new StackPanel { Margin = new Thickness(0, 3, 0, 3) };
                     sliders.Children.Add(Slider(inner, "Size", () => store.S.WidthDeg, v => store.Update(s => s.WidthDeg = v), SpaceSettings.WidthRange, 1, SettingsFormat.Degrees));
-                    sliders.Children.Add(Slider(inner, "Distance", () => store.S.Distance, v => store.Update(s => s.Distance = v), SpaceSettings.DistanceRange, 0.1, SettingsFormat.Metres));
+                    sliders.Children.Add(SettingsPanes.DepthOnly(inner, state, Slider(inner, "Distance", () => store.S.Distance, v => store.Update(s => s.Distance = v), SpaceSettings.DistanceRange, 0.1, SettingsFormat.Metres)));
                     sliders.Children.Add(Slider(inner, "Curve", () => store.S.Curve, v => store.Update(s => s.Curve = v), SpaceSettings.CurveRange, 0.05, SettingsFormat.Curve));
                     holder.Children.Add(sliders);
                 }
