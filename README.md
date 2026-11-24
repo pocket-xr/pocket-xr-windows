@@ -43,7 +43,7 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - **Readability** (Settings, Picture; off by default; untested on glasses), as on the Mac: one floating screen at
   1440 x 810, 34 degrees wide, about 42 of its pixels a degree, as a 1080p pair of glasses like the XREAL Air shows (the
   usual screens are 48). Parsec's virtual display driver offers no 1440 x 810, so with it the nearest 16:9 size it
-  offers is used (1280 x 720) and the width is set from it, still about 42 pixels a degree. It changes only the screen
+  offers is used (1600 x 900, 37.8 degrees wide) and the width is set from it, still about 42 pixels a degree. It changes only the screen
   count, the screens' width and screens moved by hand, keeps what they were, and puts exactly those back when turned
   off; both are logged with the values before and after. A phone streaming this PC with Readability on gets a screen
   three quarters of its size, drawn larger. After an idea by Dmitriy Cherdantsev, a Pocket XR for Mac tester.
