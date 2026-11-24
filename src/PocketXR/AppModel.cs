@@ -94,6 +94,8 @@ public sealed class AppState
     public double Fps;
     /// <summary>Head tracking reports are arriving.</summary>
     public bool TrackingOn;
+    /// <summary>"Use the glasses' buttons": Pocket XR has let go of the glasses' USB HID (no stream, no heartbeat).</summary>
+    public bool GlassesButtons;
     /// <summary>Head tracking reports a second.</summary>
     public int ImuHz;
     /// <summary>The gyro's bias has been learnt from stillness.</summary>
@@ -234,6 +236,8 @@ public interface IAppActions
     void OpenPcScreen() { }
     /// <summary>"Let my phone stream this PC": this PC's own host and the phone link (what the PC helper was), on or off.</summary>
     void SetPhoneStreams(bool on) { }
+    /// <summary>Lets go of the glasses' USB HID so their own buttons work (brightness), or takes it back.</summary>
+    void SetGlassesButtons(bool on) { }
     /// <summary>Every phone allowed on this PC is forgotten: each asks again, and pairs again with this PC's host.</summary>
     void ForgetPhones() { }
     /// <summary>Runs the PC screens setup for Apollo (Windows asks for admin rights).</summary>

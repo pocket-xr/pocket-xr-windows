@@ -441,7 +441,14 @@ public static class SettingsPanes
 
         yield return Kit.Card("Experimental",
             SettingsParts.ToggleRow(b, "Head tracking for XREAL Air, XBX A01 and VITURE (USB HID)", "Untested on a PC.",
-                () => store.S.HidTracking, v => store.Update(s => s.HidTracking = v)));
+                () => store.S.HidTracking, v => store.Update(s => s.HidTracking = v)),
+            Kit.Divider(),
+            SettingsParts.ToggleRow(b, "Use the glasses' buttons",
+                "Lets go of the glasses so their own buttons work, for brightness say: head tracking and taps pause until you turn this off. " +
+                "On the XBX A01+ the buttons come back only when the glasses reset themselves, which can take 1 to 3 minutes: wait for them to blink off and on, " +
+                "set the brightness, then turn this off. For glasses tracked over USB HID (the switch above).",
+                () => state.GlassesButtons, actions.SetGlassesButtons,
+                () => state.Glasses is Glasses g && g.HidImu && !g.NetworkImu && store.S.HidTracking));
 
         // Which glasses do what on a PC, said exactly: only the Aura has been used on one, and only its head tracking.
         yield return Kit.Card("Which glasses work",

@@ -452,6 +452,12 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     private void StartTracking(Glasses g)
     {
         bool useHid = !g.NetworkImu && g.HidImu && Store.S.HidTracking;
+        // "Use the glasses' buttons": nothing is opened on the glasses until it is turned off.
+        if (useHid && State.GlassesButtons)
+        {
+            Log.P($"head tracking: paused, the glasses' own buttons are in use ({g.Name})");
+            return;
+        }
         if (!g.NetworkImu && !useHid)
         {
             Log.P(g.HidImu
@@ -1430,6 +1436,22 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             return;
         }
         PcScreens.PcScreenLauncher.OpenNext(floating);
+    }
+
+    /// <summary>
+    /// "Use the glasses' buttons", as on the Steam Deck (0.7.6): head tracking stops and every file on the glasses
+    /// closes (no motion stream, no heartbeat), so their own buttons work, for brightness say; off takes them back. Not
+    /// kept across a restart. On the XBX the buttons come back only once the glasses reset themselves after the
+    /// heartbeat stops (1 to 3 minutes on a Deck); no public driver documents a command that ends that mode sooner.
+    /// </summary>
+    public void SetGlassesButtons(bool on)
+    {
+        if (State.GlassesButtons == on) return;
+        State.GlassesButtons = on;
+        Log.P($"use the glasses' buttons: {(on ? "on: head tracking paused, the glasses let go" : "off: head tracking back")}");
+        StopTracking();
+        if (glasses is Glasses g) StartTracking(g);
+        State.Notify();
     }
 
     public void SetPhoneStreams(bool on)
