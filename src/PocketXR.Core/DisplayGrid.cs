@@ -8,8 +8,49 @@ namespace PocketXR.Core;
 /// Where the system should put each floating screen's display, so the pointer moves between them the way they look in
 /// the glasses: screens side by side are left and right of each other, screens stacked are above and below.
 /// </summary>
+/// <summary>Where this PC's own screen sits next to the floating screens on Windows' desktop (for the pointer).</summary>
+public enum PcSide { Left, Below, Right, Above }
+
+public static class PcSideExt
+{
+    public static readonly PcSide[] All = { PcSide.Left, PcSide.Below, PcSide.Right, PcSide.Above };
+    public static string Title(this PcSide s) => s switch { PcSide.Below => "Below", PcSide.Right => "Right", PcSide.Above => "Above", _ => "Left" };
+    public static string Raw(this PcSide s) => s.ToString().ToLowerInvariant();
+    public static PcSide FromRaw(string? raw) => All.FirstOrDefault(s => s.Raw() == raw);
+}
+
 public static class DisplayGrid
 {
+    /// <summary>The floating screens' block, from their places (Origins) and sizes: its width and height.</summary>
+    public static (int Width, int Height) Block(IReadOnlyList<(int X, int Y)> origins, IReadOnlyList<(int Width, int Height)> sizes)
+    {
+        int w = 0, h = 0;
+        for (int i = 0; i < origins.Count && i < sizes.Count; i++)
+        {
+            w = Math.Max(w, origins[i].X + sizes[i].Width);
+            h = Math.Max(h, origins[i].Y + sizes[i].Height);
+        }
+        return (w, h);
+    }
+
+    /// <summary>
+    /// Where the floating screens' block's top left goes on the desktop, with this PC's screen ([ownX], [ownY], [ownW] x
+    /// [ownH]) on [side] of it: Left (the block to its right, tops level: as before), Right (the block to its left),
+    /// Below (the block above it, centred: a laptop under the glasses' screens, asked by a tester) or Above.
+    /// </summary>
+    public static (int X, int Y) BlockOrigin(PcSide side, int ownX, int ownY, int ownW, int ownH, int blockW, int blockH) => side switch
+    {
+        PcSide.Right => (ownX - blockW, ownY),
+        PcSide.Below => (ownX + (ownW - blockW) / 2, ownY - blockH),
+        PcSide.Above => (ownX + (ownW - blockW) / 2, ownY + ownH),
+        _ => (ownX + ownW, ownY),
+    };
+
+    /// <summary>Where the glasses' display goes, out of the floating screens' way: left of this PC's screen, or right of
+    /// it when the floating screens are on its left.</summary>
+    public static (int X, int Y) GlassesOrigin(PcSide side, int ownX, int ownY, int ownW, int glassesW) =>
+        side == PcSide.Right ? (ownX + ownW, ownY) : (ownX - glassesW, ownY);
+
     /// <summary>
     /// Each screen's top left corner in display points (x right, y down), from where the screens sit in the Space
     /// ([panels], one per screen, in the screens' order) and the displays' sizes. Screens at the same turn of the

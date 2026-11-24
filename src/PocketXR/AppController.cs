@@ -624,6 +624,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             }
         }
         ApplyTextSize();
+        ApplyPortrait();
         Log.P($"virtual displays: {floating.Count} of {wanted} are on the desktop, " +
             string.Join(", ", floating.Select(d => $"{d.GdiName} {d.Width}x{d.Height} at {Displays.Scale(d.GdiName)?.Percent.ToString() ?? "?"}%")));
     }
@@ -635,6 +636,23 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     /// Text size: each floating screen shown at Windows' scale for it (100, 125 or 150 percent; 100 with Readability
     /// on), so text is larger at the same width as seen and every pixel is still there. Logged when it changes.
     /// </summary>
+    /// <summary>
+    /// Each floating screen turned to portrait (1080 x 1920) or upright, as Settings say (for code, asked by a tester).
+    /// Windows turns the display (its Orientation setting); the Space then shows it as tall as it is, and the capture's
+    /// quarter turn is undone as for the Steam Deck's own turned panel. Logged when it changes.
+    /// </summary>
+    private void ApplyPortrait()
+    {
+        for (int i = 0; i < floating.Count; i++)
+        {
+            DisplayInfo d = floating[i];
+            bool want = Store.S.IsPortrait(i);
+            if (Displays.IsPortrait(d.GdiName) == want) continue;
+            int r = Displays.SetPortrait(d.GdiName, want);
+            Log.P($"floating screen {i + 1}: {d.GdiName} {(want ? "turned to portrait" : "upright again")}: {(r == 0 ? "done" : $"refused, {r}")}");
+        }
+    }
+
     private void ApplyTextSize()
     {
         int scale = ScreenLook.Scale(Store.S.Readability, Store.S.TextScale);
@@ -695,6 +713,16 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         if (old.Shortcuts != now.Shortcuts) RegisterShortcuts();
         if (old.LaunchAtLogin != now.LaunchAtLogin) SignIn.Set(now.LaunchAtLogin);
         if (old.Taps != now.Taps) SetTaps(now.Taps);
+        if (old.PcSide != now.PcSide)
+        {
+            Log.P($"this PC's screen: {now.PcSide.Title().ToLowerInvariant()} of the floating screens");
+            if (ArrangeDisplays(Displays.List())) ScreensChanged();
+        }
+        if (old.PortraitScreens != now.PortraitScreens)
+        {
+            Log.P($"portrait screens: {string.Join(", ", Enumerable.Range(0, 3).Where(now.IsPortrait).Select(i => i + 1).DefaultIfEmpty(0).Select(n => n == 0 ? "none" : n.ToString()))}");
+            ApplyPortrait();
+        }
         if (old.TapSensitivity != now.TapSensitivity && taps is GlassesTaps tp)
         {
             tp.SetSensitivity(now.TapSensitivity);
@@ -755,11 +783,9 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         var sizes = floating.Select(d => (Width: d.Width, Height: d.Height)).ToList();
         (int X, int Y)[] origins = DisplayGrid.Origins(State.Steady ? Array.Empty<PanelPlacement>() : panels, sizes);
         DisplayInfo? glasses = Displays.Glasses(all);
-        bool already = glasses == null || (glasses.X == own.X - glasses.Width && glasses.Y == own.Y);
-        for (int i = 0; i < floating.Count && i < origins.Length; i++)
-            already &= floating[i].X == own.X + own.Width + origins[i].X && floating[i].Y == own.Y + origins[i].Y;
-        if (already) return false;
-        Displays.Arrange(own, glasses, floating, origins);
+        PcSide side = Store.S.PcSide;
+        if (Displays.Places(own, glasses, floating, origins, side).TrueForAll(p => p.Display.X == p.X && p.Display.Y == p.Y)) return false;
+        Displays.Arrange(own, glasses, floating, origins, side);
         return true;
     }
 
@@ -900,6 +926,10 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
     {
         if (quitting) return;
         ticks++;
+        // Win+Shift+S: its still overlay on the glasses' display is hidden, so the glasses keep showing the Space and a
+        // snip on a floating screen can be seen (SnipOverlay).
+        if (picture != null && glassesDisplay is DisplayInfo onGlasses && SnipOverlay.HideOn(onGlasses) > 0)
+            Log.P($"snipping: Windows' overlay on the glasses' display hidden, so the Space stays live while you snip");
         // The Space's frame rate in the log once a minute while it is drawn (and at 10 s, to see it start).
         if (picture != null && glassesDisplay is DisplayInfo gd && pictureLoggedAt is double at
             && (Now - at > 60 || (Now - at > 10 && !pictureRateLogged)))

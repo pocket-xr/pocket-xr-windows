@@ -86,10 +86,34 @@ public static class SettingsPanes
                 () => Array.IndexOf(choices, store.S.Layout), i => store.Update(s => s.Layout = choices[i])));
         });
 
+        // Portrait screens, for code: each floating screen can be turned 1080 x 1920.
+        var portrait = new StackPanel { Orientation = Orientation.Horizontal };
+        for (int n = 0; n < 3; n++)
+        {
+            int index = n;
+            var toggle = new Toggle(b, $"Screen {index + 1} portrait", () => store.S.IsPortrait(index), v => store.Update(s => s.SetPortrait(index, v)))
+            { Margin = new Thickness(index == 0 ? 0 : 14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            var label = Kit.Line($"{index + 1}");
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.Margin = new Thickness(index == 0 ? 0 : 18, 0, 6, 0);
+            portrait.Children.Add(label);
+            portrait.Children.Add(toggle);
+            b.Add(() => { toggle.IsEnabled = index < store.S.Screens; label.Opacity = index < store.S.Screens ? 1 : 0.45; });
+        }
+        PcSide[] sides = PcSideExt.All;
+        var sideRow = new SettingsRow("This PC's screen",
+            "Where your PC's own screen sits next to the floating screens, for the pointer: going off that edge of them reaches it. Below suits a laptop under the glasses' screens.",
+            new Segmented(b, "This PC's screen", sides.Select(x => x.Title()).ToList(), () => Array.IndexOf(sides, store.S.PcSide),
+                i => store.Update(s => s.PcSide = sides[i])));
+        var portraitRow = new SettingsRow("Portrait",
+            "Turn a floating screen on its side, 1080 x 1920, for code or long pages. Windows turns it, so apps lay out tall.", portrait);
+
         return Kit.Card("Screens",
             screensRow,
             driverLine, driver,
             restartLine, restart,
+            Kit.Divider(), portraitRow,
+            Kit.Divider(), sideRow,
             // "Sharper text" (twice the pixels on each screen) is the Mac's; the Windows app does not do it yet, so
             // the switch is left out rather than shown doing nothing.
             Kit.Divider(), layout);

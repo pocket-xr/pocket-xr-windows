@@ -375,6 +375,22 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     public bool Taps = false;
     /// <summary>Tap sensitivity, percent, 25 to 300 (GlassesTaps.SetSensitivity): 100 the Steam Deck's values.</summary>
     public int TapSensitivity = 100;
+    /// <summary>Floating screens turned to portrait (1080 x 1920, for code), by number: bit 0 screen 1, bit 1 screen 2,
+    /// bit 2 screen 3. None at first.</summary>
+    public int PortraitScreens = 0;
+    /// <summary>Where this PC's own screen sits next to the floating screens on the desktop: Left (as before), Below
+    /// (a laptop under the glasses' screens), Right or Above.</summary>
+    public PcSide PcSide = PcSide.Left;
+
+    /// <summary>Whether floating screen [index] (from 0) is turned to portrait.</summary>
+    public bool IsPortrait(int index) => index is >= 0 and < 3 && (PortraitScreens & (1 << index)) != 0;
+
+    /// <summary>Floating screen [index] turned to portrait or back.</summary>
+    public void SetPortrait(int index, bool on)
+    {
+        if (index is < 0 or >= 3) return;
+        PortraitScreens = on ? PortraitScreens | (1 << index) : PortraitScreens & ~(1 << index);
+    }
     /// <summary>The pointer jumps to the screen you look at when it is on another screen.</summary>
     public bool PointerFollowsHead = false;
 
@@ -460,6 +476,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             s.Curve = Held(s.Curve, CurveRange);
             s.TextScale = ScreenLook.Nearest(s.TextScale);
             s.TapSensitivity = Math.Clamp(s.TapSensitivity, GlassesTaps.SensitivityMin, GlassesTaps.SensitivityMax);
+            s.PortraitScreens &= 0b111;
             s.IpdMm = Held(s.IpdMm, IpdRange);
             s.Glow = Held(s.Glow, (0, 1));
             s.Brightness = Held(s.Brightness, BrightnessRange);
@@ -582,6 +599,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         HeadScroll = other.HeadScroll;
         Taps = other.Taps;
         TapSensitivity = other.TapSensitivity;
+        PortraitScreens = other.PortraitScreens;
+        PcSide = other.PcSide;
         PointerFollowsHead = other.PointerFollowsHead;
         SteadySixDof = other.SteadySixDof;
         SteadyOn = other.SteadyOn;
@@ -617,7 +636,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             && EdgeFade == other.EdgeFade && Brightness == other.Brightness && HeadTracking == other.HeadTracking
             && TrackingMode == other.TrackingMode && RecentreFollowsTilt == other.RecentreFollowsTilt
             && DrawSmoothing == other.DrawSmoothing && StillLock == other.StillLock
-            && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll && Taps == other.Taps && TapSensitivity == other.TapSensitivity
+            && DisplayDelayMs == other.DisplayDelayMs && HeadScroll == other.HeadScroll && Taps == other.Taps && TapSensitivity == other.TapSensitivity && PortraitScreens == other.PortraitScreens && PcSide == other.PcSide
             && PointerFollowsHead == other.PointerFollowsHead && SteadySixDof == other.SteadySixDof && SteadyOn == other.SteadyOn
             && HidTracking == other.HidTracking && Shortcuts == other.Shortcuts && LaunchAtLogin == other.LaunchAtLogin
             && TourSeen == other.TourSeen && PanelAtStart == other.PanelAtStart
@@ -692,6 +711,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             ("headScroll", x => x.WriteBooleanValue(HeadScroll)),
             ("taps", x => x.WriteBooleanValue(Taps)),
             ("tapSensitivity", x => x.WriteNumberValue(TapSensitivity)),
+            ("portraitScreens", x => x.WriteNumberValue(PortraitScreens)),
+            ("pcSide", x => x.WriteStringValue(PcSide.Raw())),
             ("pointerFollowsHead", x => x.WriteBooleanValue(PointerFollowsHead)),
             ("steadySixDof", x => x.WriteBooleanValue(SteadySixDof)),
             ("steadyOn", x => x.WriteBooleanValue(SteadyOn)),
@@ -774,6 +795,8 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
         if (SpaceSettingsJson.Has(c, "headScroll", out v)) s.HeadScroll = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "taps", out v)) s.Taps = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "tapSensitivity", out v)) s.TapSensitivity = SpaceSettingsJson.Int(v);
+        if (SpaceSettingsJson.Has(c, "portraitScreens", out v)) s.PortraitScreens = SpaceSettingsJson.Int(v);
+        if (SpaceSettingsJson.Has(c, "pcSide", out v)) s.PcSide = PcSideExt.FromRaw(SpaceSettingsJson.String(v));
         if (SpaceSettingsJson.Has(c, "pointerFollowsHead", out v)) s.PointerFollowsHead = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadySixDof", out v)) s.SteadySixDof = SpaceSettingsJson.Bool(v);
         if (SpaceSettingsJson.Has(c, "steadyOn", out v)) s.SteadyOn = SpaceSettingsJson.Bool(v);
