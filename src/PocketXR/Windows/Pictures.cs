@@ -74,6 +74,34 @@ public static class Pictures
         return panels;
     }
 
+    /// <summary>
+    /// The control panel for 1 to 6 screens in every layout they are offered, and 6 in two rows moved by hand, to see
+    /// the Place pad keep every screen clear of its words and buttons: pad-N-LAYOUT.png. Only when asked for
+    /// (PocketXR --render-ui FOLDER pad).
+    /// </summary>
+    public static void PadPictures(string folder)
+    {
+        void One(string name, SettingsStore store, AppState state)
+        {
+            var binder = new Binder();
+            FrameworkElement column = ControlPanel.Column(store, state, new NoActions(), binder);
+            UiRender.WindowPng(Path.Combine(folder, name), "Pocket XR", column, ControlPanel.Width, null, ControlPanel.StripRight(state, binder));
+        }
+        for (int n = 1; n <= ScreenCount.Max; n++)
+        {
+            foreach (ArrangeLayout layout in SpaceLayout.Choices(n))
+            {
+                var store = new SettingsStore(persist: false);
+                int count = n;
+                store.Update(s => { s.Screens = count; s.Layout = layout; });
+                One($"pad-{n}-{layout.RawValue()}.png", store, State(store, glasses: true, screens: n, pointerOn: 0));
+            }
+        }
+        var moved = new SettingsStore(persist: false);
+        moved.Update(s => { s.Screens = 6; s.Layout = ArrangeLayout.Stacked; s.MoveScreen(0, 10, 12); });
+        One("pad-6-stacked-moved.png", moved, State(moved, glasses: true, screens: 6, pointerOn: 0));
+    }
+
     public static void ControlPanelPictures(string folder)
     {
         void One(string name, SettingsStore store, AppState state)

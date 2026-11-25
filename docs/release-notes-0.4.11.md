@@ -18,6 +18,9 @@ screens at first, and 3 PC screens for the phone when Apollo is set up, as befor
   stops the extra Apollos and keeps their settings as `.off` files, so choosing more again brings them back on their
   old ports with their phones still paired. The phone can name the number itself (`"screens"` in its setup request);
   Pocket XR for Android does not send it yet, so the setup asks.
+- **The control panel's Place pad fits every layout.** Three stacked screens (and now two rows) ran under the pad's
+  hint and its −, +, Nearer and Further buttons; a theater with an odd number of flanks ran off its side. The pad now
+  draws the screens as large as fits inside it and clear of its words and buttons, and holds that size during a drag.
 - **Another computer in these glasses** opens up to six PC screens, and finds a computer's six Apollo ports at once.
 
 Untested: nothing has run with more than 3 screens live, in glasses or on a desktop. The layouts, the driver limits,

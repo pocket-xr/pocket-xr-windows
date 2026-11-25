@@ -22,6 +22,45 @@ public static class SixScreensChecks
         Ports();
         SetupScriptPorts();
         Layouts();
+        Pad();
+    }
+
+    /// <summary>
+    /// The control panel's Place pad (406 x 146 points) keeps every layout of 1 to 6 screens inside it and clear of
+    /// its hint (top left), − and + (bottom left) and Nearer / Further (bottom right), as the pictures drawn by
+    /// PocketXR --render-ui FOLDER pad have them.
+    /// </summary>
+    private static void Pad()
+    {
+        const double w = 406, h = 146, span = 68;
+        var keepOut = new[]
+        {
+            new PadFit.Box(12, 9, 330, 16),   // "Drag one screen, or beside them for all. Scroll to resize."
+            new PadFit.Box(10, 110, 80, 26),  // − and +
+            new PadFit.Box(262, 110, 134, 26), // Nearer, Further
+        };
+        for (int n = 1; n <= ScreenCount.Max; n++)
+        {
+            var aspects = Enumerable.Repeat(16.0 / 9, n).ToList();
+            foreach (ArrangeLayout layout in SpaceLayout.Choices(n))
+            {
+                PanelPlacement[] p = SpaceLayout.Arrange(layout, aspects, 40, 1.4, 0);
+                double scale = PadFit.Scale(p, w, h, span, keepOut);
+                Check.That(PadFit.Clear(p, w, h, scale, keepOut) && scale <= PadFit.SpanScale(p, w, h, span) + 1e-9,
+                    $"pad, {n} screens, {SpaceLayout.Title(layout, n)}: inside the pad, clear of its words and buttons");
+            }
+        }
+        PanelPlacement[] two = SpaceLayout.Arrange(ArrangeLayout.Row, Enumerable.Repeat(16.0 / 9, 2).ToList(), 40, 1.4, 0);
+        Check.That(Check.Near(PadFit.Scale(two, w, h, span, keepOut), PadFit.SpanScale(two, w, h, span)), "pad: two side by side drawn as large as before");
+        PanelPlacement[] three = SpaceLayout.Arrange(ArrangeLayout.Stacked, Enumerable.Repeat(16.0 / 9, 3).ToList(), 40, 1.4, 0);
+        PanelPlacement[] six = SpaceLayout.Arrange(ArrangeLayout.Stacked, Enumerable.Repeat(16.0 / 9, 6).ToList(), 40, 1.4, 0);
+        Check.That(!PadFit.Clear(three, w, h, PadFit.SpanScale(three, w, h, span), keepOut)
+            && !PadFit.Clear(six, w, h, PadFit.SpanScale(six, w, h, span), keepOut), "pad: three stacked and two rows ran under the words at the old scale");
+        var moved = six.ToArray();
+        moved[0].YawDeg += 80;
+        double far = PadFit.Scale(moved, w, h, span, keepOut);
+        Check.That(PadFit.Clear(moved, w, h, far, keepOut), "pad: a screen moved far to one side still fits");
+        Check.That(PadFit.Scale(Array.Empty<PanelPlacement>(), w, h, span, keepOut) == h / span, "pad: no screens, the usual scale");
     }
 
     private static void Counts()
