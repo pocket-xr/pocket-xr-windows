@@ -43,10 +43,27 @@ public static class SettingsPanes
 
     private static FrameworkElement ScreensCard(SettingsStore store, AppState state, IAppActions actions, Binder b)
     {
-        var screens = new Segmented(b, "Screens", new[] { "1", "2", "3" }, () => store.S.Screens - 1,
-            i => store.Update(s => s.Screens = i + 1));
+        // 1 to 6 (3 up to 0.4.10), fewer when the driver is known to make fewer (SudoVDA's maxMonitors set lower): the
+        // picker is made again when that changes.
+        var screens = new Border();
+        int screensBuiltFor = -1;
+        var screensInner = new Binder();
+        b.Add(() =>
+        {
+            int offered = ScreenCount.Offered(state.DriverLimit);
+            if (offered == screensBuiltFor)
+            {
+                screensInner.Sync();
+                return;
+            }
+            screensBuiltFor = offered;
+            screensInner = new Binder();
+            screens.Child = new Segmented(screensInner, "Screens", Enumerable.Range(1, offered).Select(n => n.ToString()).ToList(),
+                () => Math.Min(store.S.Screens, offered) - 1, i => store.Update(s => s.Screens = i + 1));
+            screensInner.Sync();
+        });
         // Unlike the Mac, Windows lets displays be added and removed while Pocket XR runs: no restart.
-        var screensRow = new SettingsRow("Screens", "How many floating screens Pocket XR adds to your PC.", screens);
+        var screensRow = new SettingsRow("Screens", "How many floating screens Pocket XR adds to your PC, up to six.", screens);
 
         // Windows makes a floating screen only with a virtual display driver: said here, where screens are asked for.
         TextBlock why = Kit.Small("");
@@ -86,9 +103,10 @@ public static class SettingsPanes
                 () => Array.IndexOf(choices, store.S.Layout), i => store.Update(s => s.Layout = choices[i])));
         });
 
-        // Portrait screens, for code: each floating screen can be turned 1080 x 1920.
-        var portrait = new StackPanel { Orientation = Orientation.Horizontal };
-        for (int n = 0; n < 3; n++)
+        // Portrait screens, for code: each floating screen can be turned 1080 x 1920. A switch for screens 1 to 3 always
+        // (as before), and for 4 to 6 when there are that many; the row wraps if the window is narrow.
+        var portrait = new WrapPanel { Orientation = Orientation.Horizontal };
+        for (int n = 0; n < ScreenCount.Max; n++)
         {
             int index = n;
             var toggle = new Toggle(b, $"Screen {index + 1} portrait", () => store.S.IsPortrait(index), v => store.Update(s => s.SetPortrait(index, v)))
@@ -98,15 +116,35 @@ public static class SettingsPanes
             label.Margin = new Thickness(index == 0 ? 0 : 18, 0, 6, 0);
             portrait.Children.Add(label);
             portrait.Children.Add(toggle);
-            b.Add(() => { toggle.IsEnabled = index < store.S.Screens; label.Opacity = index < store.S.Screens ? 1 : 0.45; });
+            b.Add(() =>
+            {
+                toggle.IsEnabled = index < store.S.Screens;
+                label.Opacity = index < store.S.Screens ? 1 : 0.45;
+                var shown = index < Math.Max(ScreenCount.Earlier, store.S.Screens) ? Visibility.Visible : Visibility.Collapsed;
+                toggle.Visibility = label.Visibility = shown;
+            });
         }
         PcSide[] sides = PcSideExt.All;
         var sideRow = new SettingsRow("This PC's screen",
             "Where your PC's own screen sits next to the floating screens, for the pointer: going off that edge of them reaches it. Below suits a laptop under the glasses' screens.",
             new Segmented(b, "This PC's screen", sides.Select(x => x.Title()).ToList(), () => Array.IndexOf(sides, store.S.PcSide),
                 i => store.Update(s => s.PcSide = sides[i])));
-        var portraitRow = new SettingsRow("Portrait",
-            "Turn a floating screen on its side, 1080 x 1920, for code or long pages. Windows turns it, so apps lay out tall.", portrait);
+        // Up to three switches sit at the row's right, as before; four to six go under its words, where they fit.
+        var portraitBeside = new Border();
+        var portraitUnder = new Border { Margin = new Thickness(Theme.Inset, 0, Theme.Inset, 12) };
+        var portraitRow = new StackPanel();
+        portraitRow.Children.Add(new SettingsRow("Portrait",
+            "Turn a floating screen on its side, 1080 x 1920, for code or long pages. Windows turns it, so apps lay out tall.", portraitBeside));
+        portraitRow.Children.Add(portraitUnder);
+        b.Add(() =>
+        {
+            bool under = store.S.Screens > ScreenCount.Earlier;
+            Border to = under ? portraitUnder : portraitBeside, from = under ? portraitBeside : portraitUnder;
+            if (to.Child == portrait) return;
+            from.Child = null;
+            to.Child = portrait;
+            portraitUnder.Visibility = under ? Visibility.Visible : Visibility.Collapsed;
+        });
 
         // Windows' main display (asked by a tester): this PC's screen or a floating screen. The picker has a choice for
         // each floating screen there is, so it is made again when the count changes, as the layout picker is.

@@ -24,6 +24,8 @@ public static class Tools
         Directory.CreateDirectory(folder);
         bool Want(string name) => only.Length == 0 || only.Contains(name, StringComparer.OrdinalIgnoreCase);
         if (Want("control")) Pictures.ControlPanelPictures(folder);
+        // Only when named: 25 pictures of the Place pad (PadPictures).
+        if (only.Contains("pad", StringComparer.OrdinalIgnoreCase)) Pictures.PadPictures(folder);
         if (Want("tray")) TrayMenu.Pictures(folder);
         if (Want("settings")) SettingsWindow.Pictures(folder);
         if (Want("tour")) TourWindow.Pictures(folder);

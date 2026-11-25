@@ -16,7 +16,7 @@ no account, no paid tier. Same glasses, same rules about what is sent to them.
 ## How it works
 
 ```
- PC apps live on 1 to 3 floating screens (virtual displays made by a display driver)
+ PC apps live on 1 to 6 floating screens (virtual displays made by a display driver)
         │  Windows treats them as real monitors: windows, full screen, Win+Shift+arrow all work
         ▼
  Desktop Duplication (DXGI), one per floating screen, straight into Direct3D textures; the pointer is drawn in

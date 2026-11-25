@@ -65,7 +65,7 @@ public static class RenderTools
                 default: throw new ArgumentException($"--render-space does not know {a}");
             }
         }
-        screens = Math.Clamp(screens, 1, 3);
+        screens = Math.Clamp(screens, 1, ScreenCount.Max);
         int width = sbs ? 3840 : 1920, height = 1080;
 
         using GpuDevice gpu = GpuDevice.Create();
@@ -191,12 +191,15 @@ public static class RenderTools
         ['1'] = new[] { "..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###." },
         ['2'] = new[] { ".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####" },
         ['3'] = new[] { "####.", "....#", "....#", ".###.", "....#", "....#", "####." },
+        ['4'] = new[] { "...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#." },
+        ['5'] = new[] { "#####", "#....", "####.", "....#", "....#", "#...#", ".###." },
+        ['6'] = new[] { "..##.", ".#...", "#....", "####.", "#...#", "#...#", ".###." },
         ['F'] = new[] { "#####", "#....", "#....", "####.", "#....", "#....", "#...." },
     };
 
     /// <summary>
     /// Screen [number]'s made-up picture, blue, green, red, alpha: a grid on the screen's own colour (1 blue, 2
-    /// green, 3 red-brown), a light border, its number in the middle, a red square with a white F at the top left
+    /// green, 3 red-brown, 4 purple, 5 teal, 6 olive), a light border, its number in the middle, a red square with a white F at the top left
     /// and a green square at the top right.
     /// </summary>
     internal static byte[] TestPattern(int number, int width, int height)
@@ -206,6 +209,9 @@ public static class RenderTools
         {
             1 => (0x20, 0x40, 0x78),
             2 => (0x1C, 0x60, 0x40),
+            4 => (0x5A, 0x30, 0x78),
+            5 => (0x18, 0x5C, 0x66),
+            6 => (0x60, 0x60, 0x20),
             _ => (0x78, 0x34, 0x2C),
         };
         void Fill(int x, int y, int w, int h, byte r, byte g, byte b)
@@ -242,7 +248,7 @@ public static class RenderTools
         Glyph('F', 50, 30, 20, 0xFF, 0xFF, 0xFF);
         Fill(width - 120, 0, 120, 120, 0x30, 0xD0, 0x50);
         int cell = height / 14;
-        Glyph((char)('0' + Math.Clamp(number, 1, 3)), (width - 5 * cell) / 2, (height - 7 * cell) / 2, cell, 0xFF, 0xFF, 0xFF);
+        Glyph((char)('0' + Math.Clamp(number, 1, ScreenCount.Max)), (width - 5 * cell) / 2, (height - 7 * cell) / 2, cell, 0xFF, 0xFF, 0xFF);
         return p;
     }
 

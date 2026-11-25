@@ -45,7 +45,7 @@ public static class PcScreenLauncher
     }
 
     /// <summary>Opens the next PC screen not yet open. <paramref name="floating"/>: the floating screens, in order.
-    /// Returns the PC screen's number, or 0 when all three are open.</summary>
+    /// Returns the PC screen's number, or 0 when all of them (six) are open.</summary>
     public static int OpenNext(IReadOnlyList<DisplayInfo> floating)
     {
         for (int slot = 0; slot < PcScreenLogic.Count; slot++)
@@ -63,7 +63,7 @@ public static class PcScreenLauncher
             Log.P($"pc screens: opened PC screen {slot + 1} ({string.Join(' ', args)})");
             return slot + 1;
         }
-        Log.P("pc screens: all three are open");
+        Log.P($"pc screens: all {PcScreenLogic.Count} are open");
         return 0;
     }
 

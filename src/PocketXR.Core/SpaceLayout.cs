@@ -71,7 +71,7 @@ public partial record struct PanelPlacement
 
 /// <summary>
 /// The Space's layout and settings, as Pocket XR's PanelLayout has them (numbers from the Deck's space.py), and the
-/// premade arrangements of Pocket XR's ArrangeLayouts for 1 to 3 screens.
+/// premade arrangements of Pocket XR's ArrangeLayouts for 1 to 3 screens, and Windows' own for 4 to 6 (0.4.11).
 /// </summary>
 public static class SpaceLayout
 {
@@ -131,7 +131,7 @@ public static class SpaceLayout
     // MARK: - The premade arrangements
 
     /// <summary>
-    /// The layouts offered for [count] screens (1...3), in menu order. With one screen "Main + side" and "Stacked"
+    /// The layouts offered for [count] screens (1...6), in menu order. With one screen "Main + side" and "Stacked"
     /// would be the same as "Center", so they are left out.
     /// </summary>
     public static ArrangeLayout[] Choices(int count)
@@ -149,13 +149,14 @@ public static class SpaceLayout
             case ArrangeLayout.Row:
                 if (count <= 1) return "Center";
                 if (count == 2) return "Side by side";
-                return "Three across";
+                return count switch { 3 => "Three across", 4 => "Four across", 5 => "Five across", _ => "Six across" };
             case ArrangeLayout.MainSide:
                 if (count <= 1) return "Center"; // one screen: the same as the row
                 if (count == 2) return "Main + side";
-                return "Main + two stacked";
+                if (count == 3) return "Main + two stacked";
+                return "Main + sides";
             case ArrangeLayout.Stacked:
-                return "Stacked";
+                return count <= ScreenCount.Earlier ? "Stacked" : "Two rows";
             default:
                 return "Theater";
         }
@@ -163,14 +164,15 @@ public static class SpaceLayout
 
     /// <summary>
     /// Where each screen goes. [aspects] are width / height per screen; [widthDeg] the main screen's angular width,
-    /// [distance] metres, [curve] 0...2.5 applied to every screen. Anything else than 1 to 3 screens, and the two
-    /// "main" layouts with one screen, fall back to the row.
+    /// [distance] metres, [curve] 0...2.5 applied to every screen. Anything else than 1 to 6 screens, and the two
+    /// "main" layouts with one screen, fall back to the row. 4 to 6 screens: Main + sides has a column each side of the
+    /// main screen, Stacked becomes two rows, Theater has further flanks; 1 to 3 are laid out as before.
     /// </summary>
     public static PanelPlacement[] Arrange(ArrangeLayout layout, IReadOnlyList<double> aspects, double widthDeg, double distance, double curve)
     {
         int n = aspects.Count;
         PanelPlacement[] result;
-        if (n < 1 || n > 3)
+        if (n < 1 || n > ScreenCount.Max)
         {
             result = Row(aspects: aspects, widthDeg: widthDeg, distance: distance);
         }
@@ -184,12 +186,16 @@ public static class SpaceLayout
                 case ArrangeLayout.MainSide:
                     result = n == 1
                         ? Row(aspects: aspects, widthDeg: widthDeg, distance: distance)
-                        : MainSide(aspects: aspects, widthDeg: widthDeg, distance: distance);
+                        : n <= ScreenCount.Earlier
+                            ? MainSide(aspects: aspects, widthDeg: widthDeg, distance: distance)
+                            : MainSides(aspects: aspects, widthDeg: widthDeg, distance: distance);
                     break;
                 case ArrangeLayout.Stacked:
                     result = n == 1
                         ? Row(aspects: aspects, widthDeg: widthDeg, distance: distance)
-                        : Stacked(aspects: aspects, widthDeg: widthDeg, distance: distance);
+                        : n <= ScreenCount.Earlier
+                            ? Stacked(aspects: aspects, widthDeg: widthDeg, distance: distance)
+                            : TwoRows(aspects: aspects, widthDeg: widthDeg, distance: distance);
                     break;
                 default:
                     result = Theater(aspects: aspects, widthDeg: widthDeg, distance: distance);
@@ -299,8 +305,9 @@ public static class SpaceLayout
     /// <summary>
     /// The first screen far away and large: 4.2 m wide at 5 m for a width setting of 40 degrees (45.6 degrees as
     /// seen), wider or narrower with the setting. Any other screens flank it at the user's distance, 0.6 of the
-    /// width setting each: one to its right, or the second to its left and the third to its right. The block is
-    /// centred, so with two screens the big one sits a little left of straight ahead.
+    /// width setting each: one to its right, or the second to its left and the third to its right, the fourth further
+    /// left, the fifth further right, the sixth further left again. The block is centred, so with two screens the big
+    /// one sits a little left of straight ahead.
     /// </summary>
     private static PanelPlacement[] Theater(IReadOnlyList<double> aspects, double widthDeg, double distance)
     {
@@ -332,12 +339,82 @@ public static class SpaceLayout
                 new PanelPlacement(yawDeg: -(mainX + step), widthDeg: flankW, aspect: others[0], distance: distance),
             };
         }
-        return new[]
+        var flanks = new List<PanelPlacement>
         {
             new PanelPlacement(yawDeg: 0, widthDeg: mainW, aspect: mainAspect, distance: TheaterDistance),
-            new PanelPlacement(yawDeg: step, widthDeg: flankW, aspect: others[0], distance: distance),
-            new PanelPlacement(yawDeg: -step, widthDeg: flankW, aspect: others[1], distance: distance),
         };
+        for (int i = 0; i < others.Length; i++)
+        {
+            // Left (yaw positive), right, then one flank further out each side.
+            double side = i % 2 == 0 ? 1 : -1;
+            double yaw = side * (step + (double)(i / 2) * (flankW + GapDeg));
+            flanks.Add(new PanelPlacement(yawDeg: yaw, widthDeg: flankW, aspect: others[i], distance: distance));
+        }
+        return flanks.ToArray();
+    }
+
+    /// <summary>
+    /// Main + sides, for 4 to 6 screens: the first screen [widthDeg] wide in the middle, the others half as wide in two
+    /// columns, the first half (rounded up) to its right, top to bottom, the rest to its left. Each column's middle is
+    /// level with the main screen's; all shrink together if a column would pass 35 degrees up.
+    /// </summary>
+    private static PanelPlacement[] MainSides(IReadOnlyList<double> aspects, double widthDeg, double distance)
+    {
+        double[] sides = DropFirst(aspects);
+        int rightCount = (sides.Length + 1) / 2;
+        double[] right = sides[..rightCount], left = sides[rightCount..];
+        double mainAspect = aspects[0];
+        double s = FitScale(k => HeadMath.Max(HeightDeg(widthDeg: widthDeg * k, aspect: mainAspect),
+            HeadMath.Max(ColumnHeight(aspects: right, widthDeg: widthDeg * SideShareTwo * k),
+                ColumnHeight(aspects: left, widthDeg: widthDeg * SideShareTwo * k))));
+        double mainW = widthDeg * s;
+        double sideW = widthDeg * SideShareTwo * s;
+        var result = new List<PanelPlacement>
+        {
+            new PanelPlacement(yawDeg: 0, widthDeg: mainW, aspect: mainAspect, distance: distance),
+        };
+        foreach ((double[] column, double toward) in new[] { (right, -1.0), (left, 1.0) })
+        {
+            double[] pitches = ColumnPitches(aspects: column, widthDeg: sideW);
+            // As Main + side: the column stands off by its tipped corners' reach, clear of the main screen.
+            double sideHalf = sideW / 2;
+            for (int i = 0; i < column.Length; i++)
+                sideHalf = HeadMath.Max(sideHalf, CornerReachDeg(widthDeg: sideW, heightDeg: HeightDeg(widthDeg: sideW, aspect: column[i]), pitchDeg: pitches[i]));
+            double yaw = toward * (mainW / 2 + GapDeg + sideHalf);
+            for (int i = 0; i < column.Length; i++)
+                result.Add(new PanelPlacement(yawDeg: yaw, pitchDeg: pitches[i], widthDeg: sideW, aspect: column[i], distance: distance));
+        }
+        return result.ToArray();
+    }
+
+    /// <summary>
+    /// Stacked for 4 to 6 screens: two rows, the first half (rounded up) on top, left to right, the rest below, each
+    /// row centred, 2 degrees apart, the pair centred on the horizon. Each is [widthDeg] wide unless the rows would pass
+    /// 35 degrees up or down: then all shrink together to fit.
+    /// </summary>
+    private static PanelPlacement[] TwoRows(IReadOnlyList<double> aspects, double widthDeg, double distance)
+    {
+        int topCount = (aspects.Count + 1) / 2;
+        double[] all = new double[aspects.Count];
+        for (int i = 0; i < all.Length; i++) all[i] = aspects[i];
+        double[] top = all[..topCount], bottom = all[topCount..];
+        double RowHeight(double[] row, double w)
+        {
+            double h = 0;
+            foreach (double a in row) h = HeadMath.Max(h, HeightDeg(widthDeg: w, aspect: a));
+            return h;
+        }
+        double s = FitScale(k => RowHeight(top, widthDeg * k) + GapDeg + RowHeight(bottom, widthDeg * k));
+        double w = widthDeg * s;
+        double topH = RowHeight(top, w), bottomH = RowHeight(bottom, w);
+        double half = (topH + GapDeg + bottomH) / 2;
+        var result = new List<PanelPlacement>();
+        foreach ((double[] row, double pitch) in new[] { (top, half - topH / 2), (bottom, half - topH - GapDeg - bottomH / 2) })
+        {
+            foreach (PanelPlacement p in Row(aspects: row, widthDeg: w, distance: distance))
+                result.Add(p with { PitchDeg = pitch });
+        }
+        return result.ToArray();
     }
 
     // MARK: - Helpers

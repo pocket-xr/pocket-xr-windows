@@ -12,11 +12,44 @@ namespace PocketXR.Core;
 /// </summary>
 public static class PcScreenLogic
 {
-    /// <summary>Apollo's and Sunshine's usual HTTP port. A second Apollo instance has its own (48989, 49989).</summary>
+    /// <summary>Apollo's and Sunshine's usual HTTP port. Each further Apollo instance has its own (InstancePort).</summary>
     public const int DefaultPort = 47989;
 
-    /// <summary>At most three PC screens, as on the phone: one host instance each.</summary>
-    public const int Count = 3;
+    /// <summary>At most six PC screens (three up to 0.4.10): one host instance each.</summary>
+    public const int Count = ScreenCount.Max;
+
+    /// <summary>Pocket XR for Windows' own host's base port (HostServer), clear of every Apollo instance's.</summary>
+    public const int OwnHostPort = 50989;
+
+    /// <summary>The ports a host on base port [p] listens on, as Sunshine lays them out: HTTPS p-5 to RTSP p+21 (and
+    /// Pocket XR's own host's local web on p+1).</summary>
+    public static (int Low, int High) PortSpan(int p) => (p - 5, p + 21);
+
+    /// <summary>The phone link's port (PhoneLink), not to be taken by any host.</summary>
+    public const int PhoneLinkPort = 47610;
+
+    /// <summary>
+    /// The Apollo base port for PC screen [number] (1 to 6) as Pocket XR's PC screens setup makes them: 47989, 48989
+    /// and 49989 for 1 to 3 (as before), then 1000 apart again past this app's own host at 50989: 51989, 52989, 53989.
+    /// The setup script (PocketXR-PC-Screens.ps1) has the same table; a check compares them.
+    /// </summary>
+    public static int InstancePort(int number)
+    {
+        int n = Math.Clamp(number, 1, Count);
+        int port = DefaultPort - 1000;
+        for (int i = 0; i < n; i++)
+        {
+            port += 1000;
+            if (Overlaps(PortSpan(port), PortSpan(OwnHostPort))) port += 1000;
+        }
+        return port;
+    }
+
+    /// <summary>The base ports of PC screens 1 to [count], in order.</summary>
+    public static List<int> InstancePorts(int count = Count) =>
+        Enumerable.Range(1, Math.Clamp(count, 1, Count)).Select(InstancePort).ToList();
+
+    public static bool Overlaps((int Low, int High) a, (int Low, int High) b) => a.Low <= b.High && b.Low <= a.High;
 
     /// <summary>The size streamed when the host makes no virtual display: the usual desktop, sent without stretching.</summary>
     public const int StreamW = 1920, StreamH = 1080;
@@ -135,7 +168,7 @@ public static class PcScreenLogic
 
     /// <summary>
     /// The instance PC screen <paramref name="slot"/> uses: PC screen 1 the main one (the usual port) first, PC screens 2
-    /// and 3 the extra ones first, so the main stays PC screen 1's. Only ports <paramref name="free"/> allows.
+    /// to 6 the extra ones first, so the main stays PC screen 1's. Only ports <paramref name="free"/> allows.
     /// </summary>
     public static int? InstanceFor(int slot, IEnumerable<int> ports, Func<int, bool> free)
     {

@@ -190,7 +190,7 @@ public static class TrayMenu
         In(tracking, "Head tracking", () => store.Update(s => s.HeadTracking = !s.HeadTracking), () => store.S.HeadTracking);
 
         StackPanel screens = Group("Screens", () => store.S.Screens.ToString());
-        for (int n = SpaceSettings.ScreensRange.LowerBound; n <= SpaceSettings.ScreensRange.UpperBound; n++)
+        for (int n = SpaceSettings.ScreensRange.LowerBound; n <= ScreenCount.Offered(state.DriverLimit); n++)
         {
             int count = n;
             In(screens, n.ToString(), () => store.Update(s => s.Screens = count), () => store.S.Screens == count);

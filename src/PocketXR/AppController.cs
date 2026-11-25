@@ -159,8 +159,10 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         VirtualDisplays.DriverInfo? driver = VirtualDisplays.Probe(out string why);
         State.DriverReady = driver != null;
         State.DriverWhy = why;
+        DriverFound(driver);
         Log.P(driver != null
-            ? $"virtual display driver: {driver.Name}, version {driver.Version}, watchdog {driver.WatchdogTimeoutS} s"
+            ? $"virtual display driver: {driver.Name}, version {driver.Version}, watchdog {driver.WatchdogTimeoutS} s, " +
+              $"makes at most {driver.MaxScreens?.ToString() ?? "an unknown number of"} displays"
             : $"virtual display driver: {why}");
 
         Recompute();
@@ -580,36 +582,50 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         State.Capturing = 0;
     }
 
+    /// <summary>The driver's limit on displays, for the pickers (none offers more than it makes).</summary>
+    private void DriverFound(VirtualDisplays.DriverInfo? driver)
+    {
+        State.DriverName = driver?.Name;
+        State.DriverLimit = driver?.MaxScreens;
+    }
+
     /// <summary>The floating screens, made when the glasses' display is there. Unlike the Mac, Windows lets them be
-    /// added and removed while Pocket XR runs, so a change of the screen count needs no restart.</summary>
+    /// added and removed while Pocket XR runs, so a change of the screen count needs no restart. At most what the
+    /// driver makes: fewer than asked are made when its known limit is lower, or when it refuses one part way (a
+    /// SudoVDA shared with an Apollo, whose screens count towards its limit too); the log says why.</summary>
     private void EnsureDisplays()
     {
         if (standIn != null || !State.DriverReady) return;
-        int wanted = Store.S.Screens;
+        int asked = Store.S.Screens;
+        int wanted = ScreenCount.ToMake(asked, State.DriverLimit);
         bool readability = Store.S.Readability;
         // Readability: 1440 x 810, or the nearest 16:9 size the driver offers; else 1920 x 1080 (ScreenLook).
         var sizes = ScreenLook.FloatingSizes(readability);
-        if (displays != null && displays.Screens.Count == wanted && madeForReadability == readability)
+        if (displays != null && madeForCount == wanted && madeForReadability == readability)
         {
             ApplyTextSize();
             return;
         }
+        if (ScreenCount.LimitWords(asked, State.DriverLimit, State.DriverName) is string limit) Log.P(limit);
         displays?.Dispose();
         madeForReadability = readability;
+        madeForCount = wanted;
         var size = sizes[0];
-        displays = VirtualDisplays.Make(wanted, size.Width, size.Height, 60, out string why);
+        displays = VirtualDisplays.Make(wanted, size.Width, size.Height, 60, out string why, keepSome: true);
         if (displays == null)
         {
             Log.P($"virtual displays: not made: {why}");
             State.DriverWhy = why;
             return;
         }
+        if (displays.Screens.Count < wanted)
+            Log.P($"virtual displays: {displays.Screens.Count} of {wanted} made, the rest refused ({why}); kept, not asked again until the count changes");
         // Windows takes a moment to bring a new display up.
         for (int i = 0; i < 20; i++)
         {
             List<DisplayInfo> all = Displays.List();
             RefreshFloating(all);
-            if (floating.Count == wanted) break;
+            if (floating.Count == displays.Screens.Count) break;
             Thread.Sleep(100);
         }
         // Each display at the first wanted size its driver offers (Parsec's list has no 1440 x 810), set if Windows
@@ -652,6 +668,8 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
 
     /// <summary>Whether the floating screens were made for Readability (its sizes) or not (1920 x 1080).</summary>
     private bool madeForReadability;
+    /// <summary>How many floating screens were asked of the driver when the current ones were made.</summary>
+    private int madeForCount;
 
     /// <summary>
     /// Text size: each floating screen shown at Windows' scale for it (100, 125 or 150 percent; 100 with Readability
@@ -796,7 +814,7 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
         }
         if (old.PortraitScreens != now.PortraitScreens)
         {
-            Log.P($"portrait screens: {string.Join(", ", Enumerable.Range(0, 3).Where(now.IsPortrait).Select(i => i + 1).DefaultIfEmpty(0).Select(n => n == 0 ? "none" : n.ToString()))}");
+            Log.P($"portrait screens: {string.Join(", ", Enumerable.Range(0, ScreenCount.Max).Where(now.IsPortrait).Select(i => i + 1).DefaultIfEmpty(0).Select(n => n == 0 ? "none" : n.ToString()))}");
             if (ApplyPortrait())
             {
                 // The turned screens read back now, not only when Windows says the displays changed: the Space is laid
@@ -1513,7 +1531,8 @@ public sealed class AppController : IAppActions, IHandsHost, IDisposable
             State.DriverWhy = why;
             return;
         }
-        Log.P($"virtual display driver: found now: {driver.Name}, version {driver.Version}");
+        Log.P($"virtual display driver: found now: {driver.Name}, version {driver.Version}, makes at most {driver.MaxScreens?.ToString() ?? "an unknown number of"} displays");
+        DriverFound(driver);
         State.DriverReady = true;
         State.DriverWhy = "";
         State.Notify();

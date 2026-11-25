@@ -408,6 +408,16 @@ public static class SettingsWindow
         One("settings-1-space.png", SettingsPane.Space, store, aura);
         One("settings-2-space-no-driver.png", SettingsPane.Space, bare, none);
         One("settings-3-space-renaming.png", SettingsPane.Space, store, aura, new SettingsShow { Renaming = store.S.Presets[1].Id });
+        // Six screens (0.4.11): the picker, a switch for each to turn it portrait, the main display among six.
+        var six = new SettingsStore(persist: false);
+        six.Update(s =>
+        {
+            s.Screens = 6;
+            s.Layout = ArrangeLayout.MainSide;
+            s.PortraitScreens = 1 << 5;
+            s.MainScreen = 4;
+        });
+        One("settings-3b-space-six-screens.png", SettingsPane.Space, six, Sample(six, glasses: true, screens: 6));
         One("settings-4-picture.png", SettingsPane.Picture, store, aura);
         One("settings-5-tracking.png", SettingsPane.Tracking, store, aura);
         AppState learning = Sample(store, glasses: true, screens: 2);

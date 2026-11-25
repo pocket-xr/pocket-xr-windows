@@ -19,9 +19,9 @@ public static class PierreChecks
         s.SetPortrait(1, false);
         Check.That(s.PortraitScreens == 0b100, "screen 3 only");
         s.SetPortrait(7, true);
-        Check.That(s.PortraitScreens == 0b100 && !s.IsPortrait(7), "a screen past 3 is not kept");
+        Check.That(s.PortraitScreens == 0b100 && !s.IsPortrait(7), "a screen past 6 is not kept");
         Check.That(SpaceSettings.Decode(s.Encode()).IsPortrait(2), "portrait screens are saved");
-        Check.That(new SpaceSettings { PortraitScreens = 0xFF }.Clamped.PortraitScreens == 0b111, "only three screens can be portrait");
+        Check.That(new SpaceSettings { PortraitScreens = 0xFF }.Clamped.PortraitScreens == 0b111111, "only six screens can be portrait (three up to 0.4.10)");
 
         // Where this PC's own screen sits: Left (as before: the floating screens to its right, tops level), Below (a
         // laptop under the glasses' screens: they go above it, centred), Right, Above.
@@ -82,11 +82,11 @@ public static class PierreChecks
     {
         Check.That(new SpaceSettings().MainScreen == MainDisplay.ThisPc, "this PC's screen is main at first");
         Check.That(SpaceSettings.Decode(new SpaceSettings { MainScreen = 2 }.Encode()).MainScreen == 2, "the main display is saved");
-        Check.That(new SpaceSettings { MainScreen = 9 }.Clamped.MainScreen == 3 && new SpaceSettings { MainScreen = -1 }.Clamped.MainScreen == 0,
-            "only this PC or screens 1 to 3");
+        Check.That(new SpaceSettings { MainScreen = 9 }.Clamped.MainScreen == 6 && new SpaceSettings { MainScreen = -1 }.Clamped.MainScreen == 0,
+            "only this PC or screens 1 to 6");
         Check.That(new SpaceSettings { MainScreen = 1 } != new SpaceSettings(), "a different main display is a change");
         Check.That(string.Join("|", MainDisplay.Titles(2)) == "This PC|Screen 1|Screen 2", "the picker: this PC, then each floating screen there is");
-        Check.That(MainDisplay.Titles(9).Count == 4, "at most three floating screens to pick");
+        Check.That(MainDisplay.Titles(9).Count == 7, "at most six floating screens to pick");
         Check.That(MainDisplay.FloatingIndex(0, 3) == -1, "This PC: no floating screen is main");
         Check.That(MainDisplay.FloatingIndex(2, 3) == 1, "Screen 2 is the second floating screen");
         Check.That(MainDisplay.FloatingIndex(3, 1) == -1, "Screen 3 with one floating screen: this PC's screen stays main");

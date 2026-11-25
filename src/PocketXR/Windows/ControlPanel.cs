@@ -134,7 +134,7 @@ public static class ControlPanel
         TextBlock count = Kit.Line("");
         count.VerticalAlignment = VerticalAlignment.Center;
         var pair = new PairButton(Glyph.Minus, "Remove a screen", Glyph.Plus, "Add a screen",
-            () => SetScreens(store, store.S.Screens - 1), () => SetScreens(store, store.S.Screens + 1));
+            () => SetScreens(store, state, store.S.Screens - 1), () => SetScreens(store, state, store.S.Screens + 1));
         var bottom = new DockPanel { Margin = new Thickness(0, 10, 0, 0), LastChildFill = false };
         DockPanel.SetDock(pair, Dock.Right);
         bottom.Children.Add(pair);
@@ -186,10 +186,10 @@ public static class ControlPanel
         return Kit.Card("Your screens", inner);
     }
 
-    /// <summary>One screen more or fewer, 1 to 3.</summary>
-    private static void SetScreens(SettingsStore store, int n)
+    /// <summary>One screen more or fewer, 1 to 6, at most what the driver makes.</summary>
+    private static void SetScreens(SettingsStore store, AppState state, int n)
     {
-        int to = Math.Clamp(n, SpaceSettings.ScreensRange.LowerBound, SpaceSettings.ScreensRange.UpperBound);
+        int to = Math.Clamp(n, SpaceSettings.ScreensRange.LowerBound, ScreenCount.Offered(state.DriverLimit));
         if (to != store.S.Screens) store.Update(s => s.Screens = to);
     }
 
@@ -354,37 +354,24 @@ public static class ControlPanel
     // MARK: the pad
 
     /// <summary>Degrees to points on the pad: straight ahead in the middle, left to the left, up at the top. The scale
-    /// depends only on how much the screens span, never on where they are, so a drag keeps one scale from start to end.</summary>
+    /// fits the screens' span and keeps them clear of the words and buttons over the pad ([keepOut], PadFit); a drag
+    /// holds the scale it started with ([held]), so the screens do not grow or shrink under the pointer.</summary>
     public readonly struct PadGeometry
     {
         public readonly Size Size;
         /// <summary>Points per degree.</summary>
         public readonly double Scale;
 
-        public PadGeometry(IReadOnlyList<PanelPlacement> panels, Size size)
+        public PadGeometry(IReadOnlyList<PanelPlacement> panels, Size size, IReadOnlyList<PadFit.Box>? keepOut = null, double? held = null)
         {
             Size = size;
-            double s = size.Height / PadPitchSpan;
-            if (panels.Count > 0)
-            {
-                double yawLo = double.MaxValue, yawHi = double.MinValue, pitchLo = double.MaxValue, pitchHi = double.MinValue;
-                foreach (PanelPlacement p in panels)
-                {
-                    yawLo = Math.Min(yawLo, p.YawDeg - p.WidthDeg / 2);
-                    yawHi = Math.Max(yawHi, p.YawDeg + p.WidthDeg / 2);
-                    pitchLo = Math.Min(pitchLo, p.PitchDeg - p.HeightDeg / 2);
-                    pitchHi = Math.Max(pitchHi, p.PitchDeg + p.HeightDeg / 2);
-                }
-                s = Math.Min(s, Math.Min((size.Width - 40) / Math.Max(yawHi - yawLo, 1), (size.Height - 28) / Math.Max(pitchHi - pitchLo, 1)));
-            }
-            Scale = Math.Max(s, 0.2);
+            Scale = held ?? PadFit.Scale(panels, size.Width, size.Height, PadPitchSpan, keepOut ?? Array.Empty<PadFit.Box>());
         }
 
         public Rect Rect(double yawDeg, double pitchDeg, double widthDeg, double heightDeg)
         {
-            double cx = Size.Width / 2 - yawDeg * Scale, cy = Size.Height / 2 - pitchDeg * Scale;
-            double w = widthDeg * Scale, h = heightDeg * Scale;
-            return new Rect(cx - w / 2, cy - h / 2, w, h);
+            PadFit.Box b = PadFit.Place(yawDeg, pitchDeg, widthDeg, heightDeg, Size.Width, Size.Height, Scale);
+            return new Rect(b.X, b.Y, b.W, b.H);
         }
     }
 
@@ -425,6 +412,22 @@ public static class ControlPanel
         depth.HorizontalAlignment = HorizontalAlignment.Right;
         depth.VerticalAlignment = VerticalAlignment.Bottom;
         depth.Margin = new Thickness(10);
+
+        // The words and buttons over the pad, which the screens are kept clear of: whichever are showing, where they
+        // are on the pad now.
+        pad.KeepOut = () =>
+        {
+            var boxes = new List<PadFit.Box>();
+            foreach (FrameworkElement e in new FrameworkElement[] { hint, lineUp, size, depth })
+            {
+                if (e.Visibility != Visibility.Visible || e.ActualWidth <= 0 || e.ActualHeight <= 0) continue;
+                Point at = e.TranslatePoint(new Point(0, 0), pad);
+                boxes.Add(new PadFit.Box(at.X, at.Y, e.ActualWidth, e.ActualHeight));
+            }
+            return boxes;
+        };
+        foreach (FrameworkElement e in new FrameworkElement[] { hint, lineUp, size, depth })
+            e.SizeChanged += (_, _) => pad.InvalidateVisual();
 
         var surface = new Grid { ClipToBounds = true };
         surface.Children.Add(pad);
@@ -507,13 +510,20 @@ public static class ControlPanel
         }
 
         private Size Area => new(ActualWidth, ActualHeight);
+        /// <summary>The boxes on the pad the screens keep clear of (PlaceCard sets it).</summary>
+        public Func<IReadOnlyList<PadFit.Box>>? KeepOut;
+        /// <summary>The scale a drag started with, held until it ends.</summary>
+        private double heldScale;
+
+        private PadGeometry Geometry() =>
+            new(state.Panels, Area, KeepOut?.Invoke(), dragging && heldScale > 0 ? heldScale : null);
 
         protected override void OnRender(DrawingContext dc)
         {
             Size size = Area;
             dc.DrawRectangle(Ground, null, new Rect(size));
             if (size.Width <= 20 || size.Height <= 20) return;
-            var g = new PadGeometry(state.Panels, size);
+            var g = Geometry();
             double dip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             if (state.Steady) dc.PushOpacity(0.28);
 
@@ -574,7 +584,7 @@ public static class ControlPanel
         /// <summary>The screen under a point of the pad, the topmost first, null on the space around them.</summary>
         private int? ScreenAt(Point point)
         {
-            var g = new PadGeometry(state.Panels, Area);
+            var g = Geometry();
             for (int i = state.Panels.Count - 1; i >= 0; i--)
             {
                 PanelPlacement p = state.Panels[i];
@@ -591,6 +601,7 @@ public static class ControlPanel
             last = e.GetPosition(this);
             // A drag that starts on a screen moves that screen; one that starts beside them moves them all.
             dragScreen = state.Panels.Count > 1 ? ScreenAt(last) : null;
+            heldScale = Geometry().Scale;
             dragging = true;
             CaptureMouse();
             InvalidateVisual();
@@ -600,7 +611,7 @@ public static class ControlPanel
         {
             if (!dragging) return;
             Point now = e.GetPosition(this);
-            double scale = new PadGeometry(state.Panels, Area).Scale;
+            double scale = Geometry().Scale;
             double dx = now.X - last.X, dy = now.Y - last.Y;
             last = now;
             if (scale <= 0 || (dx == 0 && dy == 0)) return;
