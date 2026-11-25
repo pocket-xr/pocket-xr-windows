@@ -26,7 +26,8 @@ namespace PocketXR.PcHost;
 ///     {"op":"pair","phone"}                       the PC's user is asked; {"ok":true,"token","pc"} or {"ok":false,"why"}
 ///     {"op":"apollo-pin","token","pin","name","port","virtual"}  the phone's PIN, given to this app's own host when
 ///                                                 [port] is its port, else typed into Apollo's web page
-///     {"op":"screens-setup","token","phone"}      the PC's user is asked, then the Apollo PC screens setup runs
+///     {"op":"screens-setup","token","phone"[,"screens"]}  the PC's user is asked, then the Apollo PC screens setup runs
+///                                                 (for "screens" PC screens, 1 to 6, when the phone says; else it asks)
 ///     {"op":"screen-prepare","token",...}         {"ok":true}: this app's host makes each stream's display itself
 ///     {"op":"status"|"start","token","alvr"}      PC VR: Steam, SteamVR and ALVR's streamer; start gets them ready
 ///     {"op":"idr","token"}                        asks ALVR for a fresh full frame
@@ -35,7 +36,7 @@ namespace PocketXR.PcHost;
 /// </summary>
 internal sealed class PhoneLink : IDisposable
 {
-    public const int Port = 47610;
+    public const int Port = PcScreenLogic.PhoneLinkPort;
     private readonly Func<string, string, bool> ask;
     private readonly HostServer? host;
     private UdpClient? udp;
@@ -154,7 +155,7 @@ internal sealed class PhoneLink : IDisposable
                 return ApolloWeb.Pin(Text(request, "pin"), name, port, wantsVirtual);
             }
             case "screens-setup":
-                return ScreensSetup(Text(request, "phone") ?? "A phone");
+                return ScreensSetup(Text(request, "phone") ?? "A phone", Number(request, "screens", 0));
             case "screen-prepare":
                 // The Mac helper sizes its virtual screen here; this app's host makes each stream's display at the
                 // stream's size itself, and Apollo does the same.
@@ -205,13 +206,13 @@ internal sealed class PhoneLink : IDisposable
         return No("the host was not waiting for a PIN");
     }
 
-    private JsonObject ScreensSetup(string phone)
+    private JsonObject ScreensSetup(string phone, int screens)
     {
         lock (askGate)
         {
             if (!ask("Pocket XR", $"{phone} asks to set up PC screens on this PC with Apollo: more screens from this PC in your glasses, and optionally use away from home.\n\nSet it up now? Windows asks for permission next."))
                 return No("not now");
-            ApolloSetup.Run();
+            ApolloSetup.Run(screens is >= 1 and <= PcScreenLogic.Count ? screens : null);
             return Yes();
         }
     }
@@ -431,15 +432,18 @@ internal static class Dpapi
 /// <summary>PC screens with Apollo: the setup script built into the app, run with admin rights (Windows asks).</summary>
 internal static class ApolloSetup
 {
-    public static void Run()
+    /// <param name="screens">How many PC screens (1 to 6) the phone asked for; null: the setup asks, Enter keeping
+    /// what is set up already (3 the first time, as before 0.4.11).</param>
+    public static void Run(int? screens = null)
     {
         try
         {
             string script = Path.Combine(Path.GetTempPath(), "PocketXR-PC-Screens.ps1");
             using (var res = typeof(ApolloSetup).Assembly.GetManifestResourceStream("PocketXR.PcScreens.ps1")!)
             using (var file = File.Create(script)) res.CopyTo(file);
-            Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\"") { UseShellExecute = true, Verb = "runas" });
-            Log.P("PC screens with Apollo: setup started");
+            string count = screens is int n ? $" -Screens {n}" : "";
+            Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\"{count}") { UseShellExecute = true, Verb = "runas" });
+            Log.P($"PC screens with Apollo: setup started{(screens is int c ? $" for {c} PC screens" : "")}");
         }
         catch (Exception e) { Log.P($"PC screens with Apollo: setup: {e.Message}"); }
     }

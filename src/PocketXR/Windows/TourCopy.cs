@@ -109,7 +109,7 @@ public static class TourCopy
     public const string SignInLine = "Pocket XR starts with Windows.";
 
     // 3. Your screens are real displays
-    public const string ScreensBody = "Windows sees one to three extra displays, to the right of your own screen. Full screen, Snap and Task view work on them as on any display.";
+    public const string ScreensBody = "Windows sees one to six extra displays, to the right of your own screen. Full screen, Snap and Task view work on them as on any display.";
     public const string ScreensPointer = "Move the pointer off the right edge of your PC's screen. It is now on the first floating screen.";
     public const string ScreensDrag = "Drag a window onto a floating screen.";
     public const string ScreensCount = "Change how many screens you have in Settings. It takes effect when Pocket XR opens again.";

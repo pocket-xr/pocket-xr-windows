@@ -128,8 +128,9 @@ public static class LayoutChecks
         // Fallbacks, curve, names.
         PanelPlacement[] one = SpaceLayout.Arrange(layout: ArrangeLayout.MainSide, aspects: new[] { wide }, widthDeg: 40, distance: 1.4, curve: 1);
         Check.That(one.Length == 1 && Check.Near(one[0].YawDeg, 0) && one[0].Curve == 1, "main + side with one screen is the row, curved");
-        PanelPlacement[] four = SpaceLayout.Arrange(layout: ArrangeLayout.Stacked, aspects: new[] { wide, wide, wide, wide }, widthDeg: 40, distance: 1.4, curve: 9);
-        Check.That(four.Length == 4 && four.All(p => p.PitchDeg == 0 && p.Curve == 2.5), "four screens fall back to the row; curve held to 2.5");
+        // Past six (never asked since 0.4.11's six; past three before) the row is the fallback.
+        PanelPlacement[] seven = SpaceLayout.Arrange(layout: ArrangeLayout.Stacked, aspects: Enumerable.Repeat(wide, 7).ToArray(), widthDeg: 40, distance: 1.4, curve: 9);
+        Check.That(seven.Length == 7 && seven.All(p => p.PitchDeg == 0 && p.Curve == 2.5), "seven screens fall back to the row; curve held to 2.5");
         Check.That(SpaceLayout.Arrange(layout: ArrangeLayout.Theater, aspects: Array.Empty<double>(), widthDeg: 40, distance: 1.4, curve: 0).Length == 0, "no screens, no placements");
         Check.That(SpaceLayout.Choices(count: 1).SequenceEqual(new[] { ArrangeLayout.Row, ArrangeLayout.Theater }), "choices for one screen");
         Check.That(SpaceLayout.Choices(count: 2).SequenceEqual(new[] { ArrangeLayout.Row, ArrangeLayout.MainSide, ArrangeLayout.Stacked, ArrangeLayout.Theater }), "choices for two screens");

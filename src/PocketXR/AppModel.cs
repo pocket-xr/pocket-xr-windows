@@ -130,6 +130,10 @@ public sealed class AppState
     public HashSet<string> ShortcutsTaken = new();
     /// <summary>Why not, in plain words, when DriverReady is false.</summary>
     public string DriverWhy = "";
+    /// <summary>The virtual display driver's name, and the most displays it makes as far as is known (null: not known,
+    /// up to 6 are offered). SudoVDA: its maxMonitors, 10 when not set; Parsec: 8.</summary>
+    public string? DriverName;
+    public int? DriverLimit;
     /// <summary>Floating screens (virtual displays) that exist now.</summary>
     public int VirtualScreens;
     /// <summary>Screens captured and showing a picture.</summary>

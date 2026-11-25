@@ -48,19 +48,21 @@ public static class ScreenShape
 
 /// <summary>
 /// Which display is Windows' main one (the taskbar's and new windows' home), as chosen in Pocket XR's Settings: this
-/// PC's own screen, or floating screen 1, 2 or 3. Asked by a tester (Pierre Zammit, 0.4.9). Windows makes main the
+/// PC's own screen, or floating screen 1 to 6 (1 to 3 up to 0.4.10). Asked by a tester (Pierre Zammit, 0.4.9). Windows makes main the
 /// display whose top left is at 0,0, so choosing one moves every display by the same amount, keeping how they join.
 /// </summary>
 public static class MainDisplay
 {
-    /// <summary>0 this PC's screen; 1 to 3 that floating screen.</summary>
-    public const int ThisPc = 0, Max = 3;
+    /// <summary>0 this PC's screen; 1 to 6 that floating screen.</summary>
+    public const int ThisPc = 0, Max = ScreenCount.Max;
 
-    /// <summary>The picker's words, for [screens] floating screens: this PC first.</summary>
+    /// <summary>The picker's words, for [screens] floating screens: this PC first. Past 3 screens the numbers alone
+    /// ("This PC", "1" ... "6"), so the picker still fits the Settings window.</summary>
     public static List<string> Titles(int screens)
     {
+        int n = Math.Clamp(screens, 0, Max);
         var titles = new List<string> { "This PC" };
-        for (int i = 1; i <= Math.Clamp(screens, 0, Max); i++) titles.Add($"Screen {i}");
+        for (int i = 1; i <= n; i++) titles.Add(n > ScreenCount.Earlier ? $"{i}" : $"Screen {i}");
         return titles;
     }
 

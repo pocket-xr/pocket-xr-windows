@@ -101,7 +101,7 @@ internal sealed class PcScreenSession : Moonlight.IListener
         foreach (var pc in helpers)
         {
             Console.WriteLine($"  {pc.Name} at {pc.Address}:{pc.Port}, this PC allowed: {PcHelperLink.Knows(pc)}");
-            var ports = pc.SunshinePorts.Count > 0 ? pc.SunshinePorts : new List<int> { 47989, 48989, 49989 };
+            var ports = pc.SunshinePorts.Count > 0 ? pc.SunshinePorts : PcScreenLogic.InstancePorts();
             foreach (int p in ports)
             {
                 try
@@ -219,8 +219,11 @@ internal sealed class PcScreenSession : Moonlight.IListener
         foreach (var pc in PcHelperLink.FindAll())
         {
             if (ThisPc.Is(pc.Address.ToString())) continue; // never this PC itself
-            var ports = pc.SunshinePorts.Count > 0 ? pc.SunshinePorts : new List<int> { 47989, 48989, 49989 };
-            var answering = ports.Where(p => ServerName(pc.Address.ToString(), p) != null).ToList();
+            // Up to six instances' ports (PC screens 1 to 6), asked at once: one that is not there costs its 1.5 s
+            // wait only once, not once per port.
+            var ports = pc.SunshinePorts.Count > 0 ? pc.SunshinePorts : PcScreenLogic.InstancePorts();
+            var asks = ports.Select(p => System.Threading.Tasks.Task.Run(() => ServerName(pc.Address.ToString(), p))).ToArray();
+            var answering = ports.Where((p, i) => asks[i].Result != null).ToList();
             int? port = PcScreenLogic.InstanceFor(slot, answering, p => !taken.Contains(PcScreenLogic.Typed(pc.Address.ToString(), p)));
             if (port is int chosen)
             {

@@ -134,7 +134,7 @@ public static class ControlPanel
         TextBlock count = Kit.Line("");
         count.VerticalAlignment = VerticalAlignment.Center;
         var pair = new PairButton(Glyph.Minus, "Remove a screen", Glyph.Plus, "Add a screen",
-            () => SetScreens(store, store.S.Screens - 1), () => SetScreens(store, store.S.Screens + 1));
+            () => SetScreens(store, state, store.S.Screens - 1), () => SetScreens(store, state, store.S.Screens + 1));
         var bottom = new DockPanel { Margin = new Thickness(0, 10, 0, 0), LastChildFill = false };
         DockPanel.SetDock(pair, Dock.Right);
         bottom.Children.Add(pair);
@@ -186,10 +186,10 @@ public static class ControlPanel
         return Kit.Card("Your screens", inner);
     }
 
-    /// <summary>One screen more or fewer, 1 to 3.</summary>
-    private static void SetScreens(SettingsStore store, int n)
+    /// <summary>One screen more or fewer, 1 to 6, at most what the driver makes.</summary>
+    private static void SetScreens(SettingsStore store, AppState state, int n)
     {
-        int to = Math.Clamp(n, SpaceSettings.ScreensRange.LowerBound, SpaceSettings.ScreensRange.UpperBound);
+        int to = Math.Clamp(n, SpaceSettings.ScreensRange.LowerBound, ScreenCount.Offered(state.DriverLimit));
         if (to != store.S.Screens) store.Update(s => s.Screens = to);
     }
 

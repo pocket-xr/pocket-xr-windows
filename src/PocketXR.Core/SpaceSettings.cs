@@ -313,7 +313,7 @@ public sealed class SpacePreset : IEquatable<SpacePreset>
 public sealed class SpaceSettings : IEquatable<SpaceSettings>
 {
     // The Space
-    /// <summary>Virtual displays, 1 to 3. Takes effect when Pocket XR starts.</summary>
+    /// <summary>Virtual displays, 1 to 6 (ScreenCount.Max; 3 up to 0.4.10). Takes effect when Pocket XR starts.</summary>
     public int Screens = 2;
     public ArrangeLayout Layout = ArrangeLayout.Row;
     /// <summary>Each screen's width as seen, degrees.</summary>
@@ -375,22 +375,22 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
     public bool Taps = false;
     /// <summary>Tap sensitivity, percent, 25 to 300 (GlassesTaps.SetSensitivity): 100 the Steam Deck's values.</summary>
     public int TapSensitivity = 100;
-    /// <summary>Floating screens turned to portrait (1080 x 1920, for code), by number: bit 0 screen 1, bit 1 screen 2,
-    /// bit 2 screen 3. None at first.</summary>
+    /// <summary>Floating screens turned to portrait (1080 x 1920, for code), by number: bit 0 screen 1 ... bit 5 screen 6.
+    /// None at first.</summary>
     public int PortraitScreens = 0;
     /// <summary>Where this PC's own screen sits next to the floating screens on the desktop: Left (as before), Below
     /// (a laptop under the glasses' screens), Right or Above.</summary>
     public PcSide PcSide = PcSide.Left;
-    /// <summary>Windows' main display (MainDisplay): 0 this PC's screen, 1 to 3 that floating screen.</summary>
+    /// <summary>Windows' main display (MainDisplay): 0 this PC's screen, 1 to 6 that floating screen.</summary>
     public int MainScreen = MainDisplay.ThisPc;
 
     /// <summary>Whether floating screen [index] (from 0) is turned to portrait.</summary>
-    public bool IsPortrait(int index) => index is >= 0 and < 3 && (PortraitScreens & (1 << index)) != 0;
+    public bool IsPortrait(int index) => index >= 0 && index < ScreenCount.Max && (PortraitScreens & (1 << index)) != 0;
 
     /// <summary>Floating screen [index] turned to portrait or back.</summary>
     public void SetPortrait(int index, bool on)
     {
-        if (index is < 0 or >= 3) return;
+        if (index < 0 || index >= ScreenCount.Max) return;
         PortraitScreens = on ? PortraitScreens | (1 << index) : PortraitScreens & ~(1 << index);
     }
     /// <summary>The pointer jumps to the screen you look at when it is on another screen.</summary>
@@ -440,7 +440,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
 
     public SpaceSettings() { }
 
-    public static readonly (int LowerBound, int UpperBound) ScreensRange = (1, 3);
+    public static readonly (int LowerBound, int UpperBound) ScreensRange = (1, ScreenCount.Max);
     public static readonly (double LowerBound, double UpperBound) WidthRange = (15.0, 100.0);
     public static readonly (double LowerBound, double UpperBound) DistanceRange = (0.5, 6.0);
     public static readonly (double LowerBound, double UpperBound) CurveRange = (0.0, 2.5);
@@ -478,7 +478,7 @@ public sealed class SpaceSettings : IEquatable<SpaceSettings>
             s.Curve = Held(s.Curve, CurveRange);
             s.TextScale = ScreenLook.Nearest(s.TextScale);
             s.TapSensitivity = Math.Clamp(s.TapSensitivity, GlassesTaps.SensitivityMin, GlassesTaps.SensitivityMax);
-            s.PortraitScreens &= 0b111;
+            s.PortraitScreens &= (1 << ScreenCount.Max) - 1;
             s.MainScreen = Math.Clamp(s.MainScreen, MainDisplay.ThisPc, MainDisplay.Max);
             s.IpdMm = Held(s.IpdMm, IpdRange);
             s.Glow = Held(s.Glow, (0, 1));

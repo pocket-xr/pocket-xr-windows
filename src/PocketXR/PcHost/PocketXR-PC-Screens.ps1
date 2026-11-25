@@ -3,10 +3,12 @@
 # Run once on the PC (double-click "Set up PC screens.cmd"). It asks Windows for admin rights, then:
 #   1. finds Apollo, or downloads and installs it with no questions; an Apollo already there is kept as it is, and a
 #      Sunshine that is on (same ports) is turned off after one question;
-#   2. makes two more Apollo instances for PC screens 2 and 3, each with its own port and its own virtual display;
+#   2. asks how many PC screens the phone should get from this PC, 1 to 6 (Enter keeps what is set up, 3 the first
+#      time), and makes an Apollo instance for each PC screen from 2 on, each with its own port and its own virtual
+#      display; instances above the number are stopped and their settings file renamed to .off (kept for later);
 #   3. adds a sign-in task, "Pocket XR PC screens", that starts them and keeps them knowing the same phones as the main
 #      Apollo: a phone paired once with the main Apollo is copied, with its permissions, to the others. So Pocket XR's
-#      PC screens 2 and 3 connect with no PIN of their own.
+#      PC screens 2 to 6 connect with no PIN of their own.
 #
 # Why copying works: every Apollo instance on a PC uses the same host certificate (config\credentials\cacert.pem), and
 # keeps its paired phones in root.named_devices of its own state file. Instances must not share one state file (each
@@ -14,6 +16,7 @@
 #
 # Modes:
 #   (none)    set up, as above
+#   -Screens N  set up for N PC screens (1 to 6) without asking (Pocket XR passes the number a phone asked for)
 #   -Run      what the sign-in task runs: start the instances and copy pairings, checking every 10 seconds
 #   -Remove   stop the extra instances and remove the sign-in task (their config files stay)
 #
@@ -22,7 +25,8 @@
 
 param(
     [switch]$Run,
-    [switch]$Remove
+    [switch]$Remove,
+    [int]$Screens = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,11 +35,19 @@ $InstallDir = Join-Path $env:ProgramFiles 'Pocket XR'
 $InstalledScript = Join-Path $InstallDir 'PocketXR-PC-Screens.ps1'
 $LogDir = Join-Path $env:ProgramData 'PocketXR'
 $LogPath = Join-Path $LogDir 'pc-screens.log'
-# PC screens 2 and 3: Apollo's base port for each. An instance uses its port - 5 to + 21, so 1000 apart is plenty.
-$Screens = @(
+# PC screens 2 to 6: Apollo's base port for each. An instance uses its port - 5 to + 21, so 1000 apart is plenty.
+# 50989 is skipped: Pocket XR for Windows' own host is there (50984 to 51010). The same table as PcScreenLogic.InstancePort
+# in the app, which a check compares with this one.
+$ScreenPorts = @(
     @{ Number = 2; Port = 48989 },
-    @{ Number = 3; Port = 49989 }
+    @{ Number = 3; Port = 49989 },
+    @{ Number = 4; Port = 51989 },
+    @{ Number = 5; Port = 52989 },
+    @{ Number = 6; Port = 53989 }
 )
+$MaxScreens = 6
+$DefaultScreens = 3
+$OwnHostPort = 50989
 
 function Log($text) {
     try {
@@ -170,13 +182,23 @@ function Port-Busy($port) {
     return [bool]$busy
 }
 
-# One extra instance's config and state, made once.
+# Whether an instance on [port] would share a port with Pocket XR for Windows' own host.
+function Near-OwnHost($port) {
+    return (($port - 5) -le ($OwnHostPort + 21)) -and (($OwnHostPort - 5) -le ($port + 21))
+}
+
+# One extra instance's config and state, made once. One turned off earlier (.off) is turned on again as it was.
 function New-Screen($apollo, $screen) {
     $n = $screen.Number
     $confPath = Screen-Conf $apollo $n
     if (Test-Path $confPath) { return }
+    if (Test-Path "$confPath.off") {
+        Move-Item -Path "$confPath.off" -Destination $confPath -Force
+        Say "PC screen $n's Apollo is on again, on port $(Screen-Port $apollo $n)."
+        return
+    }
     $port = $screen.Port
-    while (Port-Busy $port) { $port += 100 }
+    while ((Port-Busy $port) -or (Near-OwnHost $port)) { $port += 100 }
     $lines = @(
         "# Made by Pocket XR's PC screens setup: the Apollo for Pocket XR's PC screen $n.",
         "# Started at sign-in by the task ""$TaskName"". Remove it by running the setup with -Remove.",
@@ -212,6 +234,41 @@ function Stop-Screen($apollo, $n) {
     foreach ($p in @(Get-ScreenProcess $apollo $n)) {
         try { Stop-Process -Id $p.ProcessId -Force } catch {}
     }
+}
+
+# A PC screen above the number asked for: stopped, and its settings file renamed to .off so the sign-in task leaves it
+# off. Its state file (paired phones) stays, so turning it on again needs no pairing.
+function Disable-Screen($apollo, $n) {
+    $confPath = Screen-Conf $apollo $n
+    if (-not (Test-Path $confPath)) { return }
+    Stop-Screen $apollo $n
+    Move-Item -Path $confPath -Destination "$confPath.off" -Force
+    Say "PC screen $n's Apollo is off (its settings are kept in $confPath.off)."
+}
+
+# How many PC screens are set up now: the main Apollo and each extra instance with a settings file. 3 when none is
+# (a first setup, as before 0.4.11).
+function Get-ScreenCount($apollo) {
+    $on = @($ScreenPorts | Where-Object { Test-Path (Screen-Conf $apollo $_.Number) })
+    if ($on.Count -gt 0) { return ($on | ForEach-Object { $_.Number } | Measure-Object -Maximum).Maximum }
+    # Every extra one turned off by an earlier setup for 1 PC screen.
+    $off = @($ScreenPorts | Where-Object { Test-Path ((Screen-Conf $apollo $_.Number) + '.off') })
+    if ($off.Count -gt 0) { return 1 }
+    return $DefaultScreens
+}
+
+# The number of PC screens: -Screens when given, else asked; Enter keeps what is set up.
+function Read-ScreenCount($apollo) {
+    $now = Get-ScreenCount $apollo
+    if ($Screens -ge 1 -and $Screens -le $MaxScreens) { return $Screens }
+    for ($try = 0; $try -lt 3; $try++) {
+        $answer = Read-Host "How many PC screens should your phone get from this PC, 1 to $MaxScreens? (Enter keeps $now)"
+        if (-not $answer) { return $now }
+        $n = 0
+        if ([int]::TryParse($answer.Trim(), [ref]$n) -and $n -ge 1 -and $n -le $MaxScreens) { return $n }
+        Say "Type a number from 1 to $MaxScreens."
+    }
+    return $now
 }
 
 # Copies the main Apollo's phones (and its web login) into an extra instance's state, if they differ. Returns $true
@@ -259,7 +316,7 @@ function Sync-Screen($apollo, $n, $mainState) {
 function Sync-All($apollo) {
     $mainState = Read-Json (Get-MainStatePath $apollo)
     if (-not $mainState) { return }
-    foreach ($s in $Screens) {
+    foreach ($s in $ScreenPorts) {
         $n = $s.Number
         if (-not (Test-Path (Screen-Conf $apollo $n))) { continue }
         Sync-Screen $apollo $n $mainState | Out-Null
@@ -455,6 +512,7 @@ if ($Run) {
 if (-not (Test-Admin)) {
     $argsLine = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
     if ($Remove) { $argsLine += ' -Remove' }
+    if ($Screens -ge 1) { $argsLine += " -Screens $Screens" }
     Start-Process -FilePath 'powershell.exe' -ArgumentList $argsLine -Verb RunAs
     exit
 }
@@ -464,8 +522,8 @@ try {
     if ($Remove) {
         Stop-RunLoop
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-        if ($apollo) { foreach ($s in $Screens) { Stop-Screen $apollo $s.Number } }
-        Say 'PC screens 2 and 3 are stopped and will not start at sign-in. Their settings files are left in Apollo''s config folder.'
+        if ($apollo) { foreach ($s in $ScreenPorts) { Stop-Screen $apollo $s.Number } }
+        Say 'PC screens 2 to 6 are stopped and will not start at sign-in. Their settings files are left in Apollo''s config folder.'
     } else {
         Say 'Pocket XR PC screens setup'
         Say ''
@@ -480,7 +538,11 @@ try {
         $svc = Get-Service -Name 'ApolloService' -ErrorAction SilentlyContinue
         if ($svc -and $svc.Status -ne 'Running') { Start-Service 'ApolloService'; Say 'Started Apollo.' }
         Ensure-ApolloLogin $apollo
-        foreach ($s in $Screens) { New-Screen $apollo $s }
+        $count = Read-ScreenCount $apollo
+        Log "setup: $count PC screens"
+        foreach ($s in $ScreenPorts) {
+            if ($s.Number -le $count) { New-Screen $apollo $s } else { Disable-Screen $apollo $s.Number }
+        }
         Install-Task
         # Start now, without waiting for the next sign-in.
         Start-ScheduledTask -TaskName $TaskName
@@ -489,7 +551,8 @@ try {
         if ($away -match '^[Yy]') { Enable-Away }
         Say ''
         Say 'Done. On your phone, open PC screen in Pocket XR and tap this PC, then click Yes on this PC.'
-        Say 'After that, PC screen 2 and PC screen 3 connect by themselves.'
+        if ($count -eq 2) { Say 'After that, PC screen 2 connects by itself.' }
+        elseif ($count -gt 2) { Say "After that, PC screens 2 to $count connect by themselves." }
         if (-not (Test-Path $LoginFile)) {
             # No saved login: pairing shows a PIN to type in Apollo's web page, so open it.
             $main = Read-Conf (Join-Path (Join-Path $apollo 'config') 'sunshine.conf')

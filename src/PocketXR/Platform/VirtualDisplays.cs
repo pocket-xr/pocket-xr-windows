@@ -33,8 +33,24 @@ public sealed class VirtualDisplays : IDisposable
     /// name ([GdiName]) once it is on the desktop.</remarks>
     public sealed record Screen(Guid Id, int Width, int Height, int RefreshHz, long AdapterLuid, uint TargetId, int Index = -1, string? GdiName = null);
 
-    /// <summary>What the driver said about itself, read without changing anything.</summary>
-    public sealed record DriverInfo(string Name, string Version, bool TestBuild, int WatchdogTimeoutS, int WatchdogCountdownS);
+    /// <summary>What the driver said about itself, read without changing anything. [MaxScreens]: the most displays it
+    /// makes, as far as is known before asking (ScreenCount.DriverLimit), null when not known.</summary>
+    public sealed record DriverInfo(string Name, string Version, bool TestBuild, int WatchdogTimeoutS, int WatchdogCountdownS)
+    {
+        public int? MaxScreens => ScreenCount.DriverLimit(Name, Name.Contains("Sudo", StringComparison.OrdinalIgnoreCase) ? SudoMaxMonitors() : null);
+    }
+
+    /// <summary>SudoVDA's registry value maxMonitors (HKLM\SOFTWARE\SudoMaker\SudoVDA), or null when it is not set
+    /// (SudoVDA then makes at most 10). Only read.</summary>
+    public static int? SudoMaxMonitors()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\SudoMaker\SudoVDA");
+            return k?.GetValue("maxMonitors") is int v ? v : null;
+        }
+        catch (Exception) { return null; }
+    }
 
     private enum Kind { SudoVda, Parsec }
 
@@ -137,15 +153,17 @@ public sealed class VirtualDisplays : IDisposable
 
     /// <summary>
     /// Adds [count] displays of [width] by [height] at [refreshHz]. Null (with the reason in [why]) when the driver
-    /// is not there or refuses; whatever was added before a refusal is removed again.
+    /// is not there or refuses; whatever was added before a refusal is removed again, unless [keepSome]: then the
+    /// displays made before the refusal are kept (a driver at its own limit, such as SudoVDA shared with an Apollo
+    /// whose screens count too), and [why] says why there are fewer.
     /// </summary>
-    public static VirtualDisplays? Make(int count, int width, int height, int refreshHz, out string why, int idOffset = 0)
+    public static VirtualDisplays? Make(int count, int width, int height, int refreshHz, out string why, int idOffset = 0, bool keepSome = false)
     {
         SafeFileHandle? h = Open(Interface, false, out why);
         if (h == null)
         {
             SafeFileHandle? parsec = Open(ParsecInterface, true, out string parsecWhy);
-            if (parsec != null) return MakeParsec(parsec, count, out why);
+            if (parsec != null) return MakeParsec(parsec, count, out why, keepSome);
             if (!parsecWhy.StartsWith("no ", StringComparison.Ordinal)) why = parsecWhy;
             return null;
         }
@@ -168,6 +186,7 @@ public sealed class VirtualDisplays : IDisposable
             if (!Io(h, IoctlAdd, input, output, out _))
             {
                 why = $"the driver refused screen {i + 1}: error {Marshal.GetLastWin32Error()}";
+                if (keepSome && made.screens.Count > 0) return made;
                 made.Dispose();
                 return null;
             }
@@ -183,7 +202,7 @@ public sealed class VirtualDisplays : IDisposable
     /// Parsec: adds [count] displays and finds each on the desktop (a display Windows lists that was not there before,
     /// with Parsec's monitor id in its path). Parsec chooses the size and refresh rate itself.
     /// </summary>
-    private static VirtualDisplays? MakeParsec(SafeFileHandle h, int count, out string why)
+    private static VirtualDisplays? MakeParsec(SafeFileHandle h, int count, out string why, bool keepSome)
     {
         SafeFileHandle? second = Open(ParsecInterface, true, out _);
         var made = new VirtualDisplays(h, Kind.Parsec, ParsecKeepAliveMs) { pingDevice = second };
@@ -196,6 +215,7 @@ public sealed class VirtualDisplays : IDisposable
             if (index == null)
             {
                 why = $"Parsec's virtual display driver refused screen {i + 1}: error {Marshal.GetLastWin32Error()}";
+                if (keepSome && made.screens.Count > 0) return made;
                 made.Dispose();
                 return null;
             }

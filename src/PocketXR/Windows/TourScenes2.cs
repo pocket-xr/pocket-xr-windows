@@ -23,12 +23,12 @@ public static partial class TourScenes
     // ---- 5. Make the Space yours: the screens seen from behind your seat, moving with the controls ----
 
     /// <summary>
-    /// A sketch of each layout for 1 to 3 screens. The Space itself is laid out by the app's own layout code; this
+    /// A sketch of each layout for 1 to 6 screens. The Space itself is laid out by the app's own layout code; this
     /// only has to read as the same arrangement.
     /// </summary>
     public static TourSpot[] Spots(ArrangeLayout layout, int count, double sizeDeg)
     {
-        int n = Math.Min(Math.Max(count, 1), 3);
+        int n = Math.Min(Math.Max(count, 1), ScreenCount.Max);
         double step = sizeDeg + 2;
         double middle = (n - 1) / 2.0;
         var spots = new List<TourSpot>();
@@ -54,9 +54,29 @@ public static partial class TourScenes
                     spots.Add(new TourSpot(yaw, 0.54, side, 1));
                     spots.Add(new TourSpot(yaw, -0.54, side, 1));
                 }
+                else if (n > 3)
+                {
+                    // Main + sides: half-size columns right then left, as SpaceLayout lays them.
+                    int right = n / 2, left = n - 1 - right;
+                    double sideYaw = sizeDeg / 2 + 2 + sizeDeg * 0.5 / 2;
+                    foreach ((int column, double toward) in new[] { (right, 1.0), (left, -1.0) })
+                        for (int i = 0; i < column; i++)
+                            spots.Add(new TourSpot(toward * sideYaw, ((column - 1) / 2.0 - i) * 0.54, 0.5, 1));
+                }
                 break;
             }
             default:
+                if (n > 3)
+                {
+                    // Two rows, the first half on top.
+                    int top = (n + 1) / 2;
+                    for (int i = 0; i < n; i++)
+                    {
+                        int row = i < top ? 0 : 1, inRow = row == 0 ? top : n - top, at = row == 0 ? i : i - top;
+                        spots.Add(new TourSpot((at - (inRow - 1) / 2.0) * step, row == 0 ? 0.54 : -0.54, 1, 1));
+                    }
+                    break;
+                }
                 for (int i = 0; i < n; i++) spots.Add(new TourSpot(0, (middle - i) * 1.08, 1, 1));
                 break;
         }
@@ -89,12 +109,12 @@ public static partial class TourScenes
             layoutTo = ArrangeLayout.Row;
             blend = 1;
         }
-        int n = Math.Min(Math.Max(input.Screens, 1), 3);
+        int n = Math.Min(Math.Max(input.Screens, 1), ScreenCount.Max);
         // Far settings are drawn closer than they are, so the picture stays a picture.
         double d = distance <= 2 ? distance : 2 + (distance - 2) * 0.35;
 
         // The eye is behind and above the viewer, looking down a little.
-        TourCamera cam = s.Cam(cyShare: 0.55, zoom: n == 3 ? 1.45 : 1.75);
+        TourCamera cam = s.Cam(cyShare: 0.55, zoom: n > 3 ? 1.45 * 3 / n : n == 3 ? 1.45 : 1.75);
         cam.Back = 2.6;
         cam.Up = 1.25;
         cam.PitchDeg = -21;

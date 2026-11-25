@@ -16,7 +16,8 @@ namespace PocketXR.PcHost;
 /// phone can show this PC's screens with no Apollo installed. Ported in part from Sunshine and Apollo (GPLv3).
 ///
 /// Ports, from the base (HTTP) port P, as Sunshine lays them out: HTTPS P-5, video P+9, control P+10, audio P+11,
-/// RTSP P+21. The default base is 50989, clear of an Apollo's 47989, 48989 and 49989.
+/// RTSP P+21. The default base is 50989, clear of the Apollo instances Pocket XR's PC screens setup makes (47989, 48989,
+/// 49989, then 51989, 52989 and 53989 for PC screens 4 to 6: PcScreenLogic.InstancePort).
 ///
 /// Milestone 1 (20 Nov 2026): pairing with a PIN given to the host, then one display's picture as H.264. No sound,
 /// no input passed on yet, no virtual display of the phone's shape (the display is scaled to the stream's size).
@@ -24,7 +25,7 @@ namespace PocketXR.PcHost;
 internal sealed class HostServer : IDisposable
 {
     public const int DesktopAppId = 1;
-    public const int DefaultBasePort = 50989;
+    public const int DefaultBasePort = PcScreenLogic.OwnHostPort;
 
     public readonly int HttpPort, HttpsPort, VideoPort, ControlPort, AudioPort, RtspPort;
     public string Name { get; }

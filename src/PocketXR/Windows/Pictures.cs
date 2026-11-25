@@ -98,6 +98,15 @@ public static class Pictures
         });
         One("control-panel-4-three-screens.png", three, State(three, glasses: true, screens: 3, pointerOn: 1, yaw: -14, pitch: 3));
 
+        // Six screens (0.4.11), in two rows.
+        var six = new SettingsStore(persist: false);
+        six.Update(s =>
+        {
+            s.Screens = 6;
+            s.Layout = ArrangeLayout.Stacked;
+        });
+        One("control-panel-4b-six-screens.png", six, State(six, glasses: true, screens: 6, pointerOn: 4));
+
         var steady = new SettingsStore(persist: false);
         One("control-panel-5-steady.png", steady, State(steady, glasses: true, screens: 2, steady: true));
 

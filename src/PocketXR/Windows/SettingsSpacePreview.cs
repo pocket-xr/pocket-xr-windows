@@ -262,7 +262,7 @@ public sealed class SettingsSpaceCanvas : FrameworkElement
         dc.DrawRectangle(Ground, null, new Rect(size));
 
         SpaceSettings s = store.S;
-        int count = Math.Min(Math.Max(s.Screens, 1), 3);
+        int count = Math.Min(Math.Max(s.Screens, 1), ScreenCount.Max);
         var aspects = Enumerable.Repeat(16.0 / 9.0, count).ToList();
         PanelPlacement[] placements = SpaceLayout.Arrange(s.Layout, aspects, widthDeg, distance, Math.Max(curve, 0));
         bool tracking = state.TrackingOn && s.HeadTracking;

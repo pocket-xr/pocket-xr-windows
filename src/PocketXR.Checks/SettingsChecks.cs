@@ -20,7 +20,7 @@ public static class SettingsChecks
         wild.Curve = -1;
         wild.IpdMm = 10;
         SpaceSettings c = wild.Clamped;
-        Check.That(c.Screens == 3 && c.Curve == 0 && c.IpdMm == 54, "values brought inside their ranges");
+        Check.That(c.Screens == 6 && c.Curve == 0 && c.IpdMm == 54, "values brought inside their ranges");
 
         SpaceSettings? back = SpaceSettings.TryDecode(new SpaceSettings().Encode());
         Check.That(back == new SpaceSettings(), "a round trip keeps every value");

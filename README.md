@@ -16,7 +16,7 @@ rules, no account and no paid tier.
 
 ## How it is meant to work
 
-Pocket XR adds 1 to 3 screens to your PC, beside its own screen. Move the pointer off the edge and it is on them:
+Pocket XR adds 1 to 6 screens to your PC (2 at first), beside its own screen. Move the pointer off the edge and it is on them:
 drag apps there, click and type as usual. In your glasses, those screens float in front of you and stay put as you
 turn your head. With glasses that do 3D side by side, they sit at a real depth.
 
@@ -40,7 +40,12 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
   Windows turns it, so apps lay out tall. Tried on a PC with Apollo's driver (turned and back, the capture's turn
   undone as for the Steam Deck's own panel); not yet in glasses or with Parsec's driver. Since 0.4.10 each screen is
   drawn the shape Windows has it, also after a change in Windows' own Display settings (checked by sums).
-- **Main display** (Settings, Space: This PC, Screen 1, 2 or 3): which screen is Windows' main display, where the
+- **Up to six floating screens** (Settings, Space, Screens 1 to 6; the menu; + in the control panel): since 0.4.11,
+  three before. Four to six have their own layouts (four to six across, main + sides, two rows, theater with further
+  flanks). Fewer are offered when the virtual display driver makes fewer: SudoVDA makes its `maxMonitors` (10 unless
+  set, and an Apollo's own screens count too), Parsec's driver 8. Checked by sums; nothing has run with more than 3
+  screens yet.
+- **Main display** (Settings, Space: This PC, then each floating screen): which screen is Windows' main display, where the
   taskbar and new windows go; one chosen in Windows' own Settings shows there too. Checked by sums; not yet on a real
   desktop or with glasses.
 - **This PC's screen** (Settings, Space: Left, Below, Right, Above): where your PC's own screen sits next to the
@@ -75,6 +80,10 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
   Apollo needed. It also does what the separate Pocket XR PC helper did (finding this PC, pairing with no typing,
   starting SteamVR for PC VR, Apollo's PINs), so that helper is no longer needed: on first start Pocket XR stops it,
   takes it out of Windows' start list, and keeps the phones it had paired.
+- **Set up Apollo for PC screens** (the menu, or asked by the phone): Apollo instances so the phone gets up to 6 PC
+  screens from this PC (3 before 0.4.11). The setup asks how many, 1 to 6; Enter keeps what is set up (3 the first
+  time). PC screens 4 to 6 are on ports 51989, 52989 and 53989 (50989 is this app's own host). Untested with more
+  than 3 live.
 - Every control has a key that works in any app, all with Ctrl+Alt: R recentre, S Steady mode, = and - size,
   ] and [ distance, . and , curve, L next layout, D 3D, P pointer to the screen you look at, Space the launcher,
   K Pocket mode, H hand tracking.
@@ -98,7 +107,7 @@ Pocket XR lives in the notification area (the icons by the clock), under a small
 - PC screens and the host use Moonlight's stream core, `native/moonlight` (moonlight-common-c, GPL-3.0), built into
   `moonlight-pxr.dll` with Zig's C compiler by `native/moonlight/build.ps1`.
 
-What is new in each version: [docs/release-notes-0.4.10.md](docs/release-notes-0.4.10.md) and the notes beside it.
+What is new in each version: [docs/release-notes-0.4.11.md](docs/release-notes-0.4.11.md) and the notes beside it.
 
 ## Build
 
