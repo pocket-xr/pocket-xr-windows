@@ -221,6 +221,24 @@ public static class HandPalm
         double t = Turn(hand);
         return side == HandSide.Right ? t < -minOpen : t > minOpen;
     }
+
+    /// <summary>True when the back of the hand faces the camera, open (not edge on). A hand of unknown side never counts.</summary>
+    public static bool BackToCamera(HandPoints hand, double minOpen = MinOpen)
+    {
+        if (hand.Side is not HandSide side) return false;
+        double t = Turn(hand);
+        return side == HandSide.Right ? t > minOpen : t < -minOpen;
+    }
+
+    /// <summary>
+    /// The palm gestures' pose: the palm turned to your own face. With the glasses' camera, which looks out from your
+    /// face, that is the palm to the camera. With a camera that faces you (a webcam, a laptop's own), it is the back of
+    /// the hand to the camera: a hand that points and pinches at the screens shows that camera its palm, so 0.4.11's
+    /// "palm to the camera" there made a pinch and hold recentre instead of grabbing a window (a developer with an
+    /// XREAL 1S and a MacBook's camera on Pocket XR for Mac, November 2026; the same rule was here).
+    /// </summary>
+    public static bool TowardFace(HandPoints hand, bool cameraFacesYou, double minOpen = MinOpen) =>
+        cameraFacesYou ? BackToCamera(hand, minOpen) : FacesCamera(hand, minOpen);
 }
 
 /// <summary>

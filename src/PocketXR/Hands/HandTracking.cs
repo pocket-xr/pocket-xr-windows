@@ -459,7 +459,7 @@ public sealed class HandTracking
             }
             (double yaw, double pitch) = host.HeadDeg;
             HandAngles motion = look ? new HandAngles(yaw, pitch) : aim;
-            input = new HandInput(hand.PinchRatio, HandPalm.FacesCamera(hand), aim, motion);
+            input = new HandInput(hand.PinchRatio, HandPalm.TowardFace(hand, cam.Facing), aim, motion);
         }
         else if (HandsPreview.Point != null)
         {
