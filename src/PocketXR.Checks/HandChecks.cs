@@ -183,6 +183,22 @@ public static class HandChecks
         Check.That(!HandPalm.FacesCamera(edge), "hands: a hand seen edge on counts neither way");
         Check.That(HandPalm.FacesCamera(HandMade(side: HandSide.Right, palm: true, aspect: 16.0 / 9)), "hands: the palm test holds in a wide picture");
 
+        // A camera that faces the person: the palm gestures want the back of the hand to it (palm to the face), so the
+        // palm a pointing, pinching hand shows that camera is a plain pinch (a developer's MacBook camera, November 2026).
+        foreach (HandSide side in new[] { HandSide.Right, HandSide.Left })
+        {
+            HandPoints palmToCamera = HandMade(side: side, palm: true), backToCamera = HandMade(side: side, palm: false);
+            Check.That(HandPalm.BackToCamera(backToCamera) && !HandPalm.BackToCamera(palmToCamera), $"hands: the back of a {side} hand to the camera");
+            Check.That(!HandPalm.TowardFace(palmToCamera, cameraFacesYou: true), $"hands: facing camera, {side} palm to it is a plain pinch");
+            Check.That(HandPalm.TowardFace(backToCamera, cameraFacesYou: true), $"hands: facing camera, {side} back of the hand to it is the palm pose");
+            Check.That(HandPalm.TowardFace(palmToCamera, cameraFacesYou: false), $"hands: glasses' camera, {side} palm to it is the palm pose");
+            Check.That(!HandPalm.TowardFace(backToCamera, cameraFacesYou: false), $"hands: glasses' camera, {side} back of the hand is a plain pinch");
+        }
+        Check.That(!HandPalm.BackToCamera(edge) && !HandPalm.TowardFace(edge, cameraFacesYou: true), "hands: edge on is no palm pose for a facing camera");
+        var unknownBack = HandMade(side: HandSide.Right, palm: false);
+        unknownBack.Side = null;
+        Check.That(!HandPalm.TowardFace(unknownBack, cameraFacesYou: true), "hands: facing camera, a hand of unknown side never counts as the palm pose");
+
         // The pinch measure is the same whatever the picture's shape, near or far.
         Check.That(Check.Near(HandMade(gap: 0.6).PinchRatio, 0.6, 0.01), "hands: an open hand reads about 0.6");
         Check.That(Check.Near(HandMade(gap: 0.2, aspect: 16.0 / 9).PinchRatio, 0.2, 0.01), "hands: a pinch reads the same in a wide picture");

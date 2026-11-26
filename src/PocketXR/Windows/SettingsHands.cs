@@ -173,7 +173,8 @@ public static class SettingsHands
         IEnumerable<UIElement?> Rows(Binder own)
         {
             bool facing = state.HandsFacing, look = store.S.HandAim == HandAim.LookAndPinch, air = facing && !look;
-            string palm = facing ? "Palm to the camera" : "Palm to your face";
+            // The same pose with either camera (HandPalm.TowardFace): with a camera that faces you, the back of the hand to it.
+            string palm = facing ? "Palm to your face (back of the hand to the camera)" : "Palm to your face";
             yield return Gesture(HandsGlyphKind.Point, look ? "Look" : air ? "Move your hand" : "Point",
                 look ? "The pointer goes where you look while a hand is in view."
                 : air ? "The pointer moves over the screen you are looking at, as on a trackpad in the air."
